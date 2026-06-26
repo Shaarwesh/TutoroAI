@@ -410,6 +410,9 @@ def list_my_children(phone: str) -> str:
     except Exception as e:
         logger.error(f"list_my_children error: {e}")
         return "Couldn't retrieve children list right now."
+
+
+async def _get_bookings_async(phone: str):
     from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
     from app.db.crud_booking import get_bookings_by_phone
 
