@@ -81,3 +81,23 @@ J: Ya, kami menerima pembayaran pendahuluan. Sila hubungi pentadbir kami untuk m
 
 **S: Adakah yuran pendaftaran?**
 J: Terdapat yuran pendaftaran sekali sahaja sebanyak RM30 untuk pelajar baru, yang merangkumi kit permulaan.
+
+## Guru Kami
+
+**Cikgu Aishah** (Bahasa Inggeris & Bahasa Melayu) — 8 tahun pengalaman mengajar, pakar dalam membantu pelajar membina keyakinan dalam kemahiran bahasa. Bekas guru SK Tinggi.
+
+**Mr. Tan** (Matematik) — Memegang ijazah dalam Pendidikan Matematik, dikenali kerana memecahkan konsep sukar kepada langkah-langkah mudah.
+
+**Cikgu Hafiz** (Sejarah, Geografi, RBT) — Bersemangat dalam menjadikan subjek kemanusiaan menarik melalui penceritaan dan contoh dunia sebenar.
+
+## Kata-Kata Ibu Bapa
+
+> "Keyakinan anak lelaki saya dalam Matematik bertambah baik selepas 2 bulan sahaja. Saiz kelas yang kecil sangat membantu dia bertanya soalan tanpa rasa malu." — Ibu bapa pelajar Tingkatan 2
+
+## Lokasi & Tempat Letak Kereta
+
+Pusat Tuisyen Wesh terletak di lokasi yang mudah diakses di Melaka. Tempat letak kereta percuma disediakan tepat di luar pusat untuk ibu bapa.
+
+## Dasar Kelas Gantian
+
+Jika pelajar perlu tidak hadir kelas disebabkan sakit atau kecemasan, sila maklumkan kami sekurang-kurangnya 2 jam sebelum waktu yang dijadualkan. Kami akan menyusun kelas gantian dalam minggu yang sama.

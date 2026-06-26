@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EduBot — Weekly Report Card</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=Inter:wght@400;500;600;700&display=swap');
+
+  :root {
+    --navy: #1A2B4C;
+    --navy-light: #2D4570;
+    --gold: #D4A146;
+    --cream: #F7F4ED;
+    --green: #3D7A5C;
+    --terracotta: #C75D3D;
+    --ink: #232323;
+    --paper: #FFFFFF;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--cream);
+    color: var(--ink);
+    padding: 0;
+    min-height: 100vh;
+  }
+
+  .masthead {
+    background: var(--navy);
+    color: var(--cream);
+    padding: 2.5rem 2rem 2rem;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .masthead::after {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -10%;
+    width: 400px;
+    height: 400px;
+    background: radial-gradient(circle, rgba(212,161,70,0.15), transparent 70%);
+  }
+
+  .masthead-inner {
+    max-width: 1100px;
+    margin: 0 auto;
+    position: relative;
+    z-index: 1;
+  }
+
+  .eyebrow {
+    font-size: 0.75rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--gold);
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+  }
+
+  h1 {
+    font-family: 'Source Serif 4', serif;
+    font-size: 2.4rem;
+    font-weight: 700;
+    line-height: 1.1;
+  }
+
+  .subtitle {
+    margin-top: 0.5rem;
+    font-size: 0.95rem;
+    color: rgba(247,244,237,0.7);
+  }
+
+  .container {
+    max-width: 1100px;
+    margin: -1.5rem auto 0;
+    padding: 0 2rem 3rem;
+  }
+
+  .stat-strip {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: var(--navy);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 12px 30px rgba(26,43,76,0.18);
+  }
+
+  .stat-cell {
+    background: var(--paper);
+    padding: 1.75rem 1.5rem;
+    position: relative;
+  }
+
+  .stat-cell .grade-label {
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #8A8478;
+    font-weight: 600;
+    margin-bottom: 0.6rem;
+  }
+
+  .stat-cell .grade-value {
+    font-family: 'Source Serif 4', serif;
+    font-size: 2.2rem;
+    font-weight: 700;
+    color: var(--navy);
+    line-height: 1;
+  }
+
+  .stat-cell .grade-value.accent { color: var(--green); }
+  .stat-cell .grade-value.gold { color: var(--gold); }
+
+  .stat-cell .grade-sub {
+    font-size: 0.78rem;
+    color: #8A8478;
+    margin-top: 0.4rem;
+  }
+
+  .panels {
+    display: grid;
+    grid-template-columns: 1.3fr 1fr;
+    gap: 1.5rem;
+    margin-top: 1.5rem;
+  }
+
+  .panel {
+    background: var(--paper);
+    border-radius: 12px;
+    padding: 1.75rem;
+    box-shadow: 0 4px 16px rgba(26,43,76,0.06);
+  }
+
+  .panel h2 {
+    font-family: 'Source Serif 4', serif;
+    font-size: 1.15rem;
+    color: var(--navy);
+    margin-bottom: 1.2rem;
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+  }
+
+  .panel h2 .tag {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.65rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    background: var(--cream);
+    color: var(--navy);
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-weight: 600;
+  }
+
+  .subject-row {
+    display: grid;
+    grid-template-columns: 110px 1fr 36px;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.85rem;
+    font-size: 0.85rem;
+  }
+
+  .subject-name { color: var(--ink); font-weight: 500; }
+
+  .bar-track {
+    height: 8px;
+    background: var(--cream);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--gold), #E8BD6E);
+    border-radius: 4px;
+  }
+
+  .subject-count { text-align: right; color: #8A8478; font-weight: 600; }
+
+  .lead-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.7rem 0;
+    border-bottom: 1px solid var(--cream);
+    font-size: 0.85rem;
+  }
+
+  .lead-item:last-child { border-bottom: none; }
+
+  .lead-name { font-weight: 600; color: var(--ink); }
+  .lead-date { color: #8A8478; font-size: 0.75rem; margin-top: 0.1rem; }
+
+  .stage-badge {
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 0.25rem 0.6rem;
+    border-radius: 20px;
+  }
+
+  .stage-new { background: #EAE7DE; color: #8A8478; }
+  .stage-qualified { background: #FBE9D8; color: var(--terracotta); }
+  .stage-confirmed { background: #DCEFE3; color: var(--green); }
+  .stage-booked { background: #DCEFE3; color: var(--green); }
+  .stage-cancelled { background: #F4DAD3; color: var(--terracotta); }
+
+  .empty-state {
+    text-align: center;
+    padding: 2rem 1rem;
+    color: #8A8478;
+    font-size: 0.85rem;
+  }
+
+  .footer-note {
+    text-align: center;
+    margin-top: 2rem;
+    font-size: 0.75rem;
+    color: #8A8478;
+  }
+
+  .loading {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: var(--navy);
+    font-family: 'Source Serif 4', serif;
+    font-size: 1.1rem;
+  }
+
+  .error-box {
+    background: #FBE5DF;
+    color: var(--terracotta);
+    padding: 1.5rem;
+    border-radius: 12px;
+    text-align: center;
+    font-size: 0.9rem;
+  }
+
+  @media (max-width: 768px) {
+    .stat-strip { grid-template-columns: repeat(2, 1fr); }
+    .panels { grid-template-columns: 1fr; }
+    h1 { font-size: 1.8rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="masthead">
+  <div class="masthead-inner">
+    <div class="eyebrow">Wesh Tuition Centre · Powered by EduBot</div>
+    <h1>This Week's Report Card</h1>
+    <div class="subtitle" id="dateRange">Loading enrolment activity…</div>
+  </div>
+</div>
+
+<div class="container">
+  <div id="content">
+    <div class="loading">Fetching the numbers…</div>
+  </div>
+</div>
+
+<script>
+const params = new URLSearchParams(window.location.search);
+const adminKey = params.get('key') || '';
+
+async function loadStats() {
+  const content = document.getElementById('content');
+  try {
+    const res = await fetch('/admin/stats', {
+      headers: { 'X-Admin-Key': adminKey }
+    });
+    if (!res.ok) {
+      content.innerHTML = `<div class="error-box">Couldn't load data — check that your admin key (?key=...) is correct in the URL.</div>`;
+      return;
+    }
+    const data = await res.json();
+    render(data);
+  } catch (e) {
+    content.innerHTML = `<div class="error-box">Connection error: ${e.message}</div>`;
+  }
+}
+
+function stageClass(stage) {
+  const map = { new: 'stage-new', qualified: 'stage-qualified', confirmed: 'stage-confirmed', booked: 'stage-booked', cancelled: 'stage-cancelled' };
+  return map[stage] || 'stage-new';
+}
+
+function render(data) {
+  document.getElementById('dateRange').textContent = `Live snapshot · ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}`;
+
+  const maxSubjectCount = data.popular_subjects.length
+    ? Math.max(...data.popular_subjects.map(s => s.count))
+    : 1;
+
+  const subjectsHTML = data.popular_subjects.length
+    ? data.popular_subjects.map(s => `
+        <div class="subject-row">
+          <div class="subject-name">${s.subject}</div>
+          <div class="bar-track"><div class="bar-fill" style="width:${(s.count / maxSubjectCount * 100)}%"></div></div>
+          <div class="subject-count">${s.count}</div>
+        </div>
+      `).join('')
+    : `<div class="empty-state">No subject data yet — once parents start registering, popular subjects will show up here.</div>`;
+
+  const leadsHTML = data.recent_leads.length
+    ? data.recent_leads.map(l => `
+        <div class="lead-item">
+          <div>
+            <div class="lead-name">${l.name}</div>
+            <div class="lead-date">${new Date(l.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</div>
+          </div>
+          <div class="stage-badge ${stageClass(l.stage)}">${l.stage}</div>
+        </div>
+      `).join('')
+    : `<div class="empty-state">No leads yet — your first WhatsApp enquiry will show up here.</div>`;
+
+  document.getElementById('content').innerHTML = `
+    <div class="stat-strip">
+      <div class="stat-cell">
+        <div class="grade-label">Total Leads</div>
+        <div class="grade-value">${data.total_leads}</div>
+        <div class="grade-sub">all-time enquiries</div>
+      </div>
+      <div class="stat-cell">
+        <div class="grade-label">Trial Bookings</div>
+        <div class="grade-value accent">${data.total_bookings}</div>
+        <div class="grade-sub">confirmed classes</div>
+      </div>
+      <div class="stat-cell">
+        <div class="grade-label">Conversion Rate</div>
+        <div class="grade-value gold">${data.conversion_rate_percent}%</div>
+        <div class="grade-sub">lead → booking</div>
+      </div>
+      <div class="stat-cell">
+        <div class="grade-label">In Pipeline</div>
+        <div class="grade-value">${(data.leads_by_stage.new || 0) + (data.leads_by_stage.qualified || 0)}</div>
+        <div class="grade-sub">still deciding</div>
+      </div>
+    </div>
+
+    <div class="panels">
+      <div class="panel">
+        <h2>Most Requested Subjects <span class="tag">Top 10</span></h2>
+        ${subjectsHTML}
+      </div>
+      <div class="panel">
+        <h2>Recent Enquiries <span class="tag">Last 5</span></h2>
+        ${leadsHTML}
+      </div>
+    </div>
+
+    <div class="footer-note">EduBot · Bilingual WhatsApp Sales &amp; Booking Agent · Auto-refreshes on reload</div>
+  `;
+}
+
+loadStats();
+</script>
+
+</body>
+</html>

@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings
+from pydantic import field_validator
 
 
 class Settings(BaseSettings):
@@ -23,6 +24,18 @@ class Settings(BaseSettings):
     # App
     app_env: str = "development"
     secret_key: str = "change_me"
+    port: int = 8000
+    admin_whatsapp_number: str = ""  # e.g. whatsapp:+60123456789 — tuition centre owner's number
+
+    @field_validator("database_url")
+    @classmethod
+    def fix_asyncpg_driver(cls, v: str) -> str:
+        """Railway/Heroku-style URLs come as postgresql:// — convert to asyncpg driver format."""
+        if v.startswith("postgresql://"):
+            return v.replace("postgresql://", "postgresql+asyncpg://", 1)
+        if v.startswith("postgres://"):
+            return v.replace("postgres://", "postgresql+asyncpg://", 1)
+        return v
 
     class Config:
         env_file = ".env"

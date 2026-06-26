@@ -22,7 +22,7 @@ class Base(DeclarativeBase):
 
 async def init_db():
     """Create all tables on startup if they don't exist."""
-    from app.models import lead, booking  # noqa: F401 — import to register models
+    from app.models import lead, booking, student, waitlist  # noqa: F401 — import to register models
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 

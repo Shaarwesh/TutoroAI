@@ -81,3 +81,29 @@ A: Yes, we accept advance payment. Please speak to our admin for details.
 
 **Q: Is there a registration fee?**
 A: There is a one-time registration fee of RM30 for new students, which includes a starter kit.
+
+## Our Teachers
+
+**Cikgu Aishah** (English & Bahasa Melayu) — 8 years teaching experience, specializes in helping students build confidence in language skills. Former SK Tinggi teacher.
+
+**Mr. Tan** (Mathematics) — Holds a degree in Mathematics Education, known for breaking down difficult concepts into simple steps. Has helped many students improve from C to A grades.
+
+**Cikgu Hafiz** (History, Geography, RBT) — Passionate about making humanities subjects engaging through storytelling and real-world examples.
+
+## What Parents Say
+
+> "My son's confidence in Math improved so much after just 2 months. The small class size really helps him ask questions without feeling shy." — Parent of a Form 2 student
+
+> "Cikgu Aishah explains English grammar in a way that finally makes sense to my daughter. Highly recommend!" — Parent of a Year 5 student
+
+## Location & Parking
+
+Wesh Tuition Centre is conveniently located in Melaka with easy access from major roads. Free parking is available right outside the centre for parents dropping off or picking up their children.
+
+## Makeup Classes Policy
+
+If a student needs to miss a class due to illness or emergency, please inform us at least 2 hours before the scheduled time. We'll arrange a makeup class within the same week, subject to teacher availability.
+
+## Exam Preparation
+
+During exam seasons (mid-year and year-end), we offer additional weekend revision classes at no extra cost for enrolled students. These sessions focus on past-year questions and exam techniques.
