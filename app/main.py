@@ -81,14 +81,3 @@ async def admin_stats(x_admin_key: str = Header(None)):
 
     from app.tools.analytics import get_analytics_summary
     summary = await get_analytics_summary()
-    return {"status": "ok", **summary}
-
-
-@app.get("/admin/dashboard")
-async def admin_dashboard():
-    """
-    Visual analytics dashboard. Open in a browser with your admin key as a query param:
-    https://your-app.up.railway.app/admin/dashboard?key=your_secret_key
-    """
-    static_path = os.path.join(os.path.dirname(__file__), "static", "dashboard.html")
-    return FileResponse(static_path)

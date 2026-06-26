@@ -20,6 +20,17 @@ else:
 
 from app.config import settings
 
+# Load the JSON string from the environment variable
+google_creds_json = os.environ.get("GOOGLE_CREDENTIALS_JSON")
+
+if google_creds_json:
+    # Convert the string back into a dictionary
+    creds_dict = json.loads(google_creds_json)
+    creds = service_account.Credentials.from_service_account_info(creds_dict)
+else:
+    # Fallback for local testing if the variable isn't set
+    creds = service_account.Credentials.from_service_account_file('app/credentials/google_service_account.json')
+    
 logger = logging.getLogger(__name__)
 
 SCOPES = ["https://www.googleapis.com/auth/calendar"]
