@@ -10,8 +10,21 @@ from app.db.postgres import init_db
 async def lifespan(app: FastAPI):
     """Startup and shutdown events."""
     print("🚀 EduBot starting up...")
-    await init_db()
-    print("✅ Database ready")
+    try:
+        await init_db()
+        print("✅ Database ready")
+    except Exception as e:
+        print(f"⚠️  Database not available at startup: {e}")
+        print("⚠️  App will start anyway — will retry DB connections on first request")
+
+    try:
+        print("🧠 Pre-building knowledge base index...")
+        from app.tools.knowledge_base import get_vectorstore
+        get_vectorstore()
+        print("✅ Knowledge base ready")
+    except Exception as e:
+        print(f"⚠️  Knowledge base failed to pre-build: {e}")
+
     yield
     print("🛑 EduBot shutting down...")
 
