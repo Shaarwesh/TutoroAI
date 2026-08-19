@@ -14,7 +14,7 @@ PHONE = "whatsapp:+60177777777"
 async def chat(message: str, history: list) -> str:
     print(f"\n👤 User: {message}")
     reply = await run_agent(PHONE, message, history)
-    print(f"🤖 EduBot: {reply}")
+    print(f"🤖 tutoro: {reply}")
     history.append({"role": "user", "content": message})
     history.append({"role": "assistant", "content": reply})
     return reply

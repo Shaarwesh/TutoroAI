@@ -7,6 +7,11 @@ class Settings(BaseSettings):
     twilio_account_sid: str
     twilio_auth_token: str
     twilio_whatsapp_number: str
+    class Config:
+        env_file = ".env"
+        
+    # Sentry
+    sentry_dsn: str = ""
 
     # Groq
     groq_api_key: str

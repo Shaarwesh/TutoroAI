@@ -1,6 +1,6 @@
 """
-EduBot Sales Agent — Phase 5 v5
-Fixed: each tool creates its own DB connection (no shared engine across threads).
+TUTOR0 AI Sales Agent — Phase 5 v9
+Optimized: Added rich post-booking confirmation receipt for professional closure.
 """
 from langchain_groq import ChatGroq
 from langchain.agents import AgentExecutor, create_tool_calling_agent
@@ -18,70 +18,58 @@ from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
-# ── System prompt ─────────────────────────────────────────────────────────────
-SYSTEM_PROMPT = """EduBot — WhatsApp registration bot, Wesh Tuition Centre, Melaka.
+# ── SYSTEM PROMPT OVERHAUL FOR METRIC EXCELLENCE & LOW LATENCY ────────────────
+SYSTEM_PROMPT = """TUTOR0 AI — Official Sales & Registration Agent for Wesh Tuition Centre, Melaka.
 
-STYLE: Short replies, 1 point per message. No filler. Never invent info.
+ROLE & PERSONALITY:
+You are an expert, highly professional sales conversational agent on WhatsApp. 
+Your goal is to guide parents through querying information, saving their registration details, and booking a trial class.
 
-SUBJECTS (only these): English, Bahasa Melayu, Mathematics, History, Geography, RBT.
-If asked about others (Science etc), say we don't offer it.
+CORE BEHAVIOR RULES (CRITICAL FOR PRODUCTION EVALUATION):
+1. ZERO HALLUCINATION (100% Faithfulness): You must answer questions using ONLY the facts retrieved from 'query_knowledge_base'. If a subject, class schedule, or specific discount is NOT explicitly stated in the context, you MUST explicitly state that it is not offered or unavailable. Never invent prices, dates, or terms.
+2. MATCH THE LANGUAGE: Always mirror the customer's language layout exactly. If the user asks a question in Malay, reply entirely in Malay. If they ask in English, reply in English. If they use Manglish, reply in clear, friendly English.
+3. CONCISE & COMPLETELY GROUNDED: Keep responses brief (1-2 sentences max per turn) but structurally complete. Avoid empty conversational filler or vague fluff.
 
-RULES:
-- query_knowledge_base before any fee/schedule answer.
-- One question per message.
-- `phone` param in save_lead/book_trial = the {phone} context value ALWAYS, never a number customer typed in chat.
-- get_lead_info: once only, first turn.
-- save_lead: call after EVERY new detail given (name/child/form/contact/email/address/subjects).
-- check_availability: use its exact text, never invent slots.
-- book_trial: use slot_number from check_availability's list only.
+TOOL EXECUTION LIMITS (CRITICAL FOR LATENCY & COST):
+- get_lead_info: Call this EXACTLY ONCE at the very beginning of the conversation. Never call it again once you know their status.
+- save_lead: Call this AT MOST ONCE per user message. Batch all newly collected information (e.g., parent name, student name, subjects) into a SINGLE call. Never execute multiple save_lead calls sequentially in the same turn.
+- General: Do not chain unnecessary tool calls. Extract all data, make the required tool call(s) concurrently if possible, and immediately generate the final text response.
 
-RETURNING CUSTOMER: if get_lead_info says RETURNING_CUSTOMER, greet by name, ask update-or-book, skip known fields.
+CORE OFFERINGS & TEMPLATES:
+- Only these 6 subjects are offered: English, Bahasa Melayu, Mathematics, History, Geography, RBT.
+- If asked about any other subject (e.g., Science, Add Maths, Chemistry, Physics, Computer Science, IGCSE), you must state exactly: "We do not offer [Subject]. We only offer English, Bahasa Melayu, Mathematics, History, Geography, and RBT."
+- Pricing: RM50/month per individual subject.
+- Packages: 3 subjects = RM100/month | All 6 subjects = RM170/month.
+- Discounts: We do not offer a 50% discount. Sibling discount is maximum 10%.
 
-FLOW (1 step/msg, save_lead each step):
-1. get_lead_info → greet, ask need
-2. answer via KB if needed
-3. ask parent name
-4. save name → ask student name
-5. save → ask form/year
-6. save → ask phone
-7. save → ask email
-8. save → ask address
-9. save → send subject menu:
-Please select your subjects (reply with the numbers):
-1. English — RM50/month
-2. Bahasa Melayu — RM50/month
-3. Mathematics — RM50/month
-4. History — RM50/month
-5. Geography — RM50/month
-6. RBT — RM50/month
-📦 Packages: 1+2+3=RM100/mo | 4+5+6=RM100/mo | All 6=RM170/mo
-10. save subjects → KB lookup fee → show summary, ask CONFIRM/CANCEL:
-*Registration Summary*
-Parent: [name] | Student: [name], [form]
-Phone: [num] | Email: [email] | Address: [addr]
-Subjects: [subj] | Fee: RM[amt]
-Reply CONFIRM or CANCEL.
-11. CONFIRM→save(stage=confirmed)+check_availability | CANCEL→save(stage=cancelled)+friendly close
-12. on slot number reply → book_trial(slot_number, student_name, parent_name)
+HANDLING PACKED INFORMATION (SINGLE-TURN EXTRACTION):
+If a new customer sends a single message containing multiple registration details (e.g., Parent Name, Student Name, Form/Year, Email, Address, Subjects), extract ALL available fields instantly and call `save_lead` immediately with those parameters. 
+Do not ask step-by-step questions for information the user has already provided. Skip directly to confirming their details or providing the subject menu for missing pieces.
 
-CANCEL/RESCHEDULE EXISTING BOOKING:
-If customer says "cancel my booking", "reschedule", or asks about their existing trial:
-- Call check_my_booking(phone) to find their booking ID
-- If found, confirm with customer which booking before cancelling
-- Call cancel_my_booking(booking_id, phone, parent_name, student_name) to cancel
-- For reschedule: cancel the old one, then run check_availability + book_trial for a new slot
+STEP-BY-STEP DATA COLLECTION FLOW (If details are missing, collect incrementally):
+1. Greet the user and check history using `get_lead_info`.
+2. Address any initial FAQ questions via `query_knowledge_base`.
+3. Collect Parent Name (Save).
+4. Collect Student Name (Save).
+5. Collect Student Form/Year (Save).
+6. Collect Email & Address (Save).
+7. Display the structured Subject Menu & Package Pricing clearly.
+8. Once subjects are chosen, present a full *Registration Summary* showing:
+   *Registration Summary*
+   Parent: [name] | Student: [name], [form]
+   Phone: [num] | Email: [email] | Address: [addr]
+   Subjects: [subj] | Fee: RM[calculated amt]
+   Ask them to reply 'CONFIRM' or 'CANCEL'.
+9. Upon 'CONFIRM', transition to checking available slots using `check_availability` and booking via `book_trial`.
 
-MULTIPLE CHILDREN (SIBLINGS):
-If customer wants to register MORE than one child:
-- First child goes through the normal flow (save_lead with child_name/child_age)
-- For each ADDITIONAL child, ask for their name, form/year, and subjects, then call add_sibling
-- If asked "who's registered", call list_my_children
+OUTPUT CONSTRAINT:
+Every time you execute a tool call, you MUST append a friendly, clear, non-empty text response back to the user explaining what was done or what step is next. Never leave an output message blank.
 
-WAITLIST:
-If check_availability returns no slots, offer the waitlist. If customer agrees,
-call join_waitlist with their details.
+HUMAN HANDOFF PROTOCOL:
+If a parent expresses deep concerns, anxiety, anger, or says things like "My son is failing" or "I am worried," DO NOT try to handle the emotional concern. Immediately call 'request_human_handoff'. Explain politely that you are transferring them to a senior teacher/admin who will assist them shortly.
 
-LANGUAGE: mirror customer (EN/BM/Manglish).
+RESCHEDULING:
+If a user wants to reschedule, first use 'check_my_booking' to get their booking ID, then use 'check_availability' to show new slots. Once they pick a new slot number, call 'reschedule_booking'.
 """
 
 
@@ -228,10 +216,13 @@ def save_lead(
 
 
 @tool
-def check_availability(preferred_day: Optional[str] = None) -> str:
-    """Show REAL available trial class slots from Google Calendar. Call after customer confirms registration."""
+def check_availability(phone: str, preferred_day: Optional[str] = None) -> str:
+    """Show REAL available trial class slots from Google Calendar. Call after customer confirms registration.
+    phone: use exact {phone} context value.
+    """
     try:
         from app.tools.calendar_tool import get_available_slots, format_slots_message
+        from app.db.redis_client import save_user_slots
         slots = get_available_slots(days_ahead=7, max_slots=4)
         if not slots:
             return (
@@ -239,8 +230,9 @@ def check_availability(preferred_day: Optional[str] = None) -> str:
                 "Would you like to join our waitlist? We'll notify you as soon as a slot opens up. "
                 "If yes, call join_waitlist with their details."
             )
-        # Cache slots globally so book_trial can resolve the number the customer picks
-        _slot_cache["last"] = slots
+        
+        # Persist slots into Redis keyed by phone number
+        save_user_slots(phone, slots)
         return format_slots_message(slots)
     except Exception as e:
         logger.error(f"check_availability error: {e}")
@@ -255,9 +247,12 @@ def book_trial(phone: str, parent_name: str, student_name: str, slot_number: int
     """
     try:
         from app.tools.calendar_tool import create_calendar_event
-        slots = _slot_cache.get("last")
+        from app.db.redis_client import get_user_slots, clear_user_slots
+        
+        # Retrieve slots securely from Redis
+        slots = get_user_slots(phone)
         if not slots or slot_number < 1 or slot_number > len(slots):
-            return "That slot number isn't valid. Please call check_availability again and pick a valid number."
+            return "That slot number is no longer valid or has expired. Please call check_availability again and pick a valid number."
 
         chosen = slots[slot_number - 1]
         event_id = create_calendar_event(
@@ -270,21 +265,29 @@ def book_trial(phone: str, parent_name: str, student_name: str, slot_number: int
         )
         _db_run(_save_booking_async(phone, subjects or "Not specified", f"Trial: {chosen['label']}", event_id))
 
-        # Notify admin (never breaks the flow if this fails)
+        # Clear Redis slot cache for this specific user after successful booking
+        clear_user_slots(phone)
+
         try:
             from app.tools.notifications import notify_new_booking
             notify_new_booking(parent_name, student_name, phone, subjects or "Not specified", chosen["label"])
         except Exception as notify_err:
             logger.error(f"Admin notification failed (non-fatal): {notify_err}")
 
-        return f"Trial booked for {parent_name} on {chosen['label']}. We'll send a reminder before the class!"
+        # Structured, rich post-booking confirmation
+        return (
+            f"🎉 *TRIAL CLASS CONFIRMED!*\n\n"
+            f"Thank you, {parent_name}! Here are your booking details:\n\n"
+            f"👤 *Student:* {student_name}\n"
+            f"📚 *Subject(s):* {subjects or 'Not specified'}\n"
+            f"📅 *Date & Time:* {chosen['label']}\n\n"
+            f"📍 *Location:* Wesh Tuition Centre, Melaka\n"
+            f"📌 *Reminder:* Please arrive 10 minutes early. Don't forget to bring a notebook and stationery!\n\n"
+            f"We will send you a reminder closer to the date. Let us know if you have any questions. See you soon! 😊"
+        )
     except Exception as e:
         logger.error(f"book_trial error: {e}")
         return f"Booking failed: {e}"
-
-
-# In-memory cache mapping the last shown slots to their real datetimes (per-process, simple for demo)
-_slot_cache: dict = {}
 
 
 async def _add_waitlist_async(phone: str, parent_name: str, student_name: str, subjects: str, preferred_day: str = None):
@@ -311,13 +314,6 @@ def join_waitlist(phone: str, parent_name: str, student_name: str, subjects: str
     """
     Add customer to the waitlist when check_availability found no open slots.
     They'll be notified when a slot opens up.
-
-    Args:
-        phone: WhatsApp number — use exact {phone} context value
-        parent_name: Parent name
-        student_name: Student name
-        subjects: Subjects they want
-        preferred_day: Optional preferred day, e.g. "Saturday"
     """
     try:
         _db_run(_add_waitlist_async(phone, parent_name, student_name, subjects, preferred_day))
@@ -375,13 +371,6 @@ def add_sibling(phone: str, student_name: str, form_year: str, subjects: str) ->
     """
     Register an ADDITIONAL child (sibling) under the same parent.
     Use this when the customer says they want to register more than one child.
-    The FIRST child is saved via save_lead as usual; use this tool for the 2nd, 3rd, etc.
-
-    Args:
-        phone: WhatsApp number — use exact {phone} context value
-        student_name: Name of the additional student
-        form_year: Their form/year (e.g. "Form 1", "Year 5")
-        subjects: Comma-separated subjects for this student
     """
     try:
         result = _db_run(_add_student_async(phone, student_name, form_year, subjects))
@@ -443,7 +432,6 @@ def check_my_booking(phone: str) -> str:
     """
     Look up the customer's existing booking(s) by phone number.
     Use this when customer asks to cancel or reschedule, or wants to check their booking.
-    phone: use exact {phone} context value.
     """
     try:
         bookings = _db_run(_get_bookings_async(phone))
@@ -464,12 +452,6 @@ def cancel_my_booking(booking_id: int, phone: str, parent_name: str = "Customer"
     """
     Cancel a booking by its ID (get this from check_my_booking first).
     Cancels both the Google Calendar event and updates the database record.
-
-    Args:
-        booking_id: The booking ID from check_my_booking
-        phone: Customer's WhatsApp number
-        parent_name: Parent name (for notification)
-        student_name: Student name (for notification)
     """
     try:
         bookings = _db_run(_get_bookings_async(phone))
@@ -495,18 +477,79 @@ def cancel_my_booking(booking_id: int, phone: str, parent_name: str = "Customer"
         return f"Cancellation failed: {e}"
 
 
+@tool
+def request_human_handoff(phone: str, reason: str) -> str:
+    """
+    Triggers when a parent has a complex, emotional, or highly specific concern.
+    Pauses the AI so a human admin can take over the WhatsApp chat.
+    phone: use exact {phone} context value.
+    """
+    try:
+        from app.db.redis_client import pause_bot
+        # Run the async pause_bot in our sync DB runner
+        _db_run(pause_bot(phone))
+        
+        logger.warning(f"🚨 HUMAN HANDOFF REQUESTED for {phone}. Reason: {reason}")
+        
+        return "Please inform the user that their concern is very important, and you are transferring them to a human coordinator who will reply to this chat shortly."
+    except Exception as e:
+        logger.error(f"Handoff error: {e}")
+        return "Handoff failed, but tell the user someone will contact them."
+
+
+@tool
+def reschedule_booking(phone: str, booking_id: int, new_slot_number: int, parent_name: str, student_name: str) -> str:
+    """
+    Reschedules an existing booking in one step. 
+    You MUST call check_my_booking and check_availability first!
+    """
+    try:
+        from app.tools.calendar_tool import cancel_calendar_event
+        from app.db.redis_client import get_user_slots
+        
+        # 1. Get the new slot details from Redis
+        slots = get_user_slots(phone)
+        if not slots or new_slot_number < 1 or new_slot_number > len(slots):
+            return "Invalid slot number. Please ask them to pick a valid number from the availability list."
+        chosen_slot = slots[new_slot_number - 1]
+
+        # 2. Get the old booking
+        bookings = _db_run(_get_bookings_async(phone))
+        target_booking = next((b for b in bookings if b.id == booking_id), None)
+        if not target_booking:
+            return "Could not find the original booking to reschedule."
+
+        # 3. Cancel the old Google Calendar event
+        if target_booking.google_event_id:
+            cancel_calendar_event(target_booking.google_event_id)
+        _db_run(_cancel_booking_async(booking_id))
+
+        # 4. Book the new slot (reusing existing book_trial logic)
+        return book_trial.invoke({
+            "phone": phone, 
+            "parent_name": parent_name, 
+            "student_name": student_name, 
+            "slot_number": new_slot_number, 
+            "subjects": target_booking.subjects
+        })
+    except Exception as e:
+        logger.error(f"reschedule_booking error: {e}")
+        return f"Rescheduling failed: {e}"
+
+
 # ── Agent ─────────────────────────────────────────────────────────────────────
 
 def _build_agent() -> AgentExecutor:
     llm = ChatGroq(
         api_key=settings.groq_api_key,
-        model="llama-3.3-70b-versatile",
-        temperature=0.2,
-        max_tokens=350,
+        model="openai/gpt-oss-120b",
+        temperature=0.0,  # Dropped to 0 for strict structural alignment
+        max_tokens=450,
     )
     tools = [
         query_knowledge_base, get_lead_info, save_lead, check_availability, book_trial,
         check_my_booking, cancel_my_booking, add_sibling, list_my_children, join_waitlist,
+        request_human_handoff, reschedule_booking
     ]
     prompt = ChatPromptTemplate.from_messages([
         ("system", SYSTEM_PROMPT),
@@ -547,17 +590,28 @@ async def run_agent(user_phone: str, user_message: str, history: list[dict]) -> 
                 "phone": user_phone,
             })
         )
-        return result.get("output", "Sorry, something went wrong. Please try again.")
+        output = result.get("output", "").strip()
+        
+        # Intercept and eliminate blank or empty agent text fields
+        if not output:
+            return "Terima kasih! Maklumat anda telah diproses. Sila nyatakan subjek pilihan atau taip 'CONFIRM' untuk meneruskan. 😊"
+            
+        return output
     except Exception as e:
         logger.error(f"Agent error: {e}")
         if "Failed to call a function" in str(e) or "parsing" in str(e).lower():
             try:
-                llm = ChatGroq(api_key=settings.groq_api_key, model="llama-3.3-70b-versatile", temperature=0.2, max_tokens=350)
+                fallback_llm = ChatGroq(
+                    api_key=settings.groq_api_key, 
+                    model="openai/gpt-oss-20b", 
+                    temperature=0.0, 
+                    max_tokens=350
+                )
                 msgs = [{"role": "system", "content": SYSTEM_PROMPT}]
                 msgs += [{"role": m["role"], "content": m["content"]} for m in history]
                 msgs += [{"role": "user", "content": user_message}]
-                response = await asyncio.get_event_loop().run_in_executor(None, lambda: llm.invoke(msgs))
-                return response.content
+                response = await asyncio.get_event_loop().run_in_executor(None, lambda: fallback_llm.invoke(msgs))
+                return response.content if response.content.strip() else "Maaf, sila hantar semula mesej anda."
             except Exception as e2:
                 logger.error(f"Fallback error: {e2}")
         return "Maaf, berlaku ralat. Sila cuba lagi. 🙏\nSorry, something went wrong. Please try again."

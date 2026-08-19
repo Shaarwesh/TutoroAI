@@ -163,7 +163,7 @@ def create_calendar_event(
             f"Student: {student_name}\n"
             f"Phone: {phone}\n"
             f"Subjects: {subjects}\n"
-            f"Booked via EduBot WhatsApp"
+            f"Booked via tutoro WhatsApp"
         ),
         "start": {"dateTime": start.isoformat(), "timeZone": TIMEZONE},
         "end": {"dateTime": end.isoformat(), "timeZone": TIMEZONE},

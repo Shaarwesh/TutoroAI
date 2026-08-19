@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TUTOR0 AI — Live Dashboard</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=Inter:wght@400;500;600;700&display=swap');
+
+  :root {
+    --navy: #0F172A;
+    --navy-light: #1E293B;
+    --gold: #D4A146;
+    --cream: #F8FAFC;
+    --green: #10B981;
+    --terracotta: #F43F5E;
+    --ink: #334155;
+    --paper: #FFFFFF;
+    --border: #E2E8F0;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--cream);
+    color: var(--ink);
+    padding: 0;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Masthead ──────────────────────────────────────────────────────────── */
+  .masthead {
+    background: linear-gradient(135deg, var(--navy) 0%, var(--navy-light) 100%);
+    color: var(--paper);
+    padding: 3rem 2rem 4rem;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .masthead::after {
+    content: '';
+    position: absolute;
+    top: -30%;
+    right: -5%;
+    width: 500px;
+    height: 500px;
+    background: radial-gradient(circle, rgba(212,161,70,0.12), transparent 70%);
+    pointer-events: none;
+  }
+
+  .masthead-inner {
+    max-width: 1100px;
+    margin: 0 auto;
+    position: relative;
+    z-index: 1;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+  }
+
+  .header-content {
+    flex: 1;
+  }
+
+  .eyebrow {
+    font-size: 0.75rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--gold);
+    font-weight: 700;
+    margin-bottom: 0.75rem;
+  }
+
+  h1 {
+    font-family: 'Source Serif 4', serif;
+    font-size: 2.8rem;
+    font-weight: 700;
+    line-height: 1.1;
+    margin-bottom: 0.5rem;
+  }
+
+  .subtitle {
+    font-size: 1rem;
+    color: #94A3B8;
+  }
+
+  .header-actions {
+    text-align: right;
+  }
+
+  .refresh-btn {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: var(--paper);
+    padding: 0.6rem 1.2rem;
+    border-radius: 8px;
+    font-family: 'Inter', sans-serif;
+    font-weight: 500;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .refresh-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: translateY(-1px);
+  }
+
+  .refresh-btn:active {
+    transform: translateY(0);
+  }
+
+  .last-updated {
+    display: block;
+    font-size: 0.75rem;
+    color: #64748B;
+    margin-top: 0.5rem;
+  }
+
+  /* ── Layout ────────────────────────────────────────────────────────────── */
+  .container {
+    max-width: 1100px;
+    margin: -2.5rem auto 0;
+    padding: 0 2rem 3rem;
+    position: relative;
+    z-index: 10;
+  }
+
+  /* ── Stat Strip ────────────────────────────────────────────────────────── */
+  .stat-strip {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 10px 25px rgba(15, 23, 42, 0.05);
+  }
+
+  .stat-cell {
+    background: var(--paper);
+    padding: 2rem 1.5rem;
+    position: relative;
+    transition: transform 0.3s ease, background 0.3s ease;
+  }
+
+  .stat-cell:hover {
+    background: #FDFDFD;
+    transform: translateY(-2px);
+    z-index: 2;
+    box-shadow: 0 10px 20px rgba(0,0,0,0.02);
+    border-radius: 12px;
+  }
+
+  .stat-cell .grade-label {
+    font-size: 0.75rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #64748B;
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+  }
+
+  .stat-cell .grade-value {
+    font-family: 'Source Serif 4', serif;
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: var(--navy);
+    line-height: 1;
+  }
+
+  .stat-cell .grade-value.accent { color: var(--green); }
+  .stat-cell .grade-value.gold { color: var(--gold); }
+
+  .stat-cell .grade-sub {
+    font-size: 0.8rem;
+    color: #94A3B8;
+    margin-top: 0.5rem;
+  }
+
+  /* ── Panels ────────────────────────────────────────────────────────────── */
+  .panels {
+    display: grid;
+    grid-template-columns: 1.3fr 1fr;
+    gap: 1.5rem;
+    margin-top: 1.5rem;
+  }
+
+  .panel {
+    background: var(--paper);
+    border-radius: 16px;
+    padding: 2rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+    border: 1px solid var(--border);
+  }
+
+  .panel h2 {
+    font-family: 'Source Serif 4', serif;
+    font-size: 1.25rem;
+    color: var(--navy);
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  .panel h2 .tag {
+    font-family: 'Inter', sans-serif;
+    font-size: 0.65rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    background: #F1F5F9;
+    color: #475569;
+    padding: 0.25rem 0.6rem;
+    border-radius: 6px;
+    font-weight: 600;
+  }
+
+  /* ── Subjects Bar Chart ────────────────────────────────────────────────── */
+  .subject-row {
+    display: grid;
+    grid-template-columns: 120px 1fr 40px;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+  }
+
+  .subject-row:last-child { margin-bottom: 0; }
+  .subject-name { color: var(--ink); font-weight: 500; }
+
+  .bar-track {
+    height: 8px;
+    background: #F1F5F9;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--gold), #FCD34D);
+    border-radius: 4px;
+    transition: width 1s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .subject-count { text-align: right; color: #64748B; font-weight: 600; }
+
+  /* ── Lead List ─────────────────────────────────────────────────────────── */
+  .lead-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.85rem 0;
+    border-bottom: 1px solid #F1F5F9;
+    transition: background 0.2s ease;
+  }
+
+  .lead-item:last-child { border-bottom: none; padding-bottom: 0; }
+  
+  .lead-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+  }
+
+  .lead-name { font-weight: 600; color: var(--navy); font-size: 0.9rem; }
+  .lead-date { color: #94A3B8; font-size: 0.75rem; }
+
+  .stage-badge {
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    padding: 0.3rem 0.7rem;
+    border-radius: 20px;
+  }
+
+  .stage-new { background: #F1F5F9; color: #475569; }
+  .stage-qualified { background: #FEF3C7; color: #D97706; }
+  .stage-confirmed { background: #D1FAE5; color: #059669; }
+  .stage-booked { background: #D1FAE5; color: #059669; }
+  .stage-cancelled { background: #FFE4E6; color: #E11D48; }
+
+  /* ── Utility States ────────────────────────────────────────────────────── */
+  .empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: #94A3B8;
+    font-size: 0.9rem;
+    background: #F8FAFC;
+    border-radius: 8px;
+    border: 1px dashed #CBD5E1;
+  }
+
+  .footer-note {
+    text-align: center;
+    margin-top: 2.5rem;
+    font-size: 0.8rem;
+    color: #94A3B8;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+  }
+
+  .pulse-dot {
+    width: 8px;
+    height: 8px;
+    background: var(--green);
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+    70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+  }
+
+  /* Loading Skeleton */
+  .skeleton {
+    animation: skeleton-loading 1s linear infinite alternate;
+    height: 200px;
+    border-radius: 12px;
+    width: 100%;
+  }
+
+  @keyframes skeleton-loading {
+    0% { background-color: #E2E8F0; }
+    100% { background-color: #F1F5F9; }
+  }
+
+  .error-box {
+    background: #FFE4E6;
+    color: #E11D48;
+    padding: 2rem;
+    border-radius: 12px;
+    text-align: center;
+    font-size: 1rem;
+    border: 1px solid #FDA4AF;
+  }
+
+  @media (max-width: 850px) {
+    .stat-strip { grid-template-columns: repeat(2, 1fr); gap: 1px; }
+    .panels { grid-template-columns: 1fr; }
+    .masthead-inner { flex-direction: column; align-items: flex-start; gap: 1.5rem; }
+    .header-actions { text-align: left; }
+    h1 { font-size: 2.2rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="masthead">
+  <div class="masthead-inner">
+    <div class="header-content">
+      <div class="eyebrow">Wesh Tuition Centre, Melaka</div>
+      <h1>TUTOR0 AI Dashboard</h1>
+      <div class="subtitle" id="dateRange">Live Registration & Sales Telemetry</div>
+    </div>
+    <div class="header-actions">
+      <button class="refresh-btn" onclick="loadStats()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+        Refresh Data
+      </button>
+      <span class="last-updated" id="lastSync">Syncing...</span>
+    </div>
+  </div>
+</div>
+
+<div class="container">
+  <div id="content">
+    <!-- Initial Skeleton Loader -->
+    <div class="stat-strip">
+      <div class="stat-cell"><div class="skeleton" style="height: 60px;"></div></div>
+      <div class="stat-cell"><div class="skeleton" style="height: 60px;"></div></div>
+      <div class="stat-cell"><div class="skeleton" style="height: 60px;"></div></div>
+      <div class="stat-cell"><div class="skeleton" style="height: 60px;"></div></div>
+    </div>
+    <div class="panels">
+      <div class="panel"><div class="skeleton"></div></div>
+      <div class="panel"><div class="skeleton"></div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const params = new URLSearchParams(window.location.search);
+const adminKey = params.get('key') || '';
+let refreshInterval;
+
+async function loadStats() {
+  const syncLabel = document.getElementById('lastSync');
+  syncLabel.textContent = "Syncing...";
+  
+  try {
+    const res = await fetch(`https://tutoro-production-05af.up.railway.app/admin/stats`, {
+      headers: { 'X-Admin-Key': adminKey }
+    });
+    
+    if (!res.ok) {
+      document.getElementById('content').innerHTML = `
+        <div class="error-box">
+          <strong>Access Denied</strong><br>
+          Couldn't load data. Ensure your admin key (?key=YOUR_KEY) is correct in the URL.
+        </div>`;
+      syncLabel.textContent = "Sync Failed";
+      return;
+    }
+    
+    const data = await res.json();
+    render(data);
+    
+    const now = new Date();
+    syncLabel.textContent = `Last updated: ${now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit', second:'2-digit'})}`;
+    
+  } catch (e) {
+    document.getElementById('content').innerHTML = `<div class="error-box">Connection error: ${e.message}</div>`;
+    syncLabel.textContent = "Offline";
+  }
+}
+
+function stageClass(stage) {
+  const map = { 
+    new: 'stage-new', 
+    qualified: 'stage-qualified', 
+    confirmed: 'stage-confirmed', 
+    booked: 'stage-booked', 
+    cancelled: 'stage-cancelled' 
+  };
+  return map[stage.toLowerCase()] || 'stage-new';
+}
+
+function render(data) {
+  const maxSubjectCount = data.popular_subjects && data.popular_subjects.length
+    ? Math.max(...data.popular_subjects.map(s => s.count))
+    : 1;
+
+  const subjectsHTML = data.popular_subjects && data.popular_subjects.length
+    ? data.popular_subjects.map(s => `
+        <div class="subject-row">
+          <div class="subject-name">${s.subject}</div>
+          <div class="bar-track">
+            <div class="bar-fill" style="width:0%" data-width="${(s.count / maxSubjectCount * 100)}%"></div>
+          </div>
+          <div class="subject-count">${s.count}</div>
+        </div>
+      `).join('')
+    : `<div class="empty-state">No subject data yet. Popular subjects will appear here as leads register.</div>`;
+
+  const leadsHTML = data.recent_leads && data.recent_leads.length
+    ? data.recent_leads.map(l => `
+        <div class="lead-item">
+          <div class="lead-info">
+            <div class="lead-name">${l.name || 'Unknown Parent'}</div>
+            <div class="lead-date">${new Date(l.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>
+          </div>
+          <div class="stage-badge ${stageClass(l.stage)}">${l.stage}</div>
+        </div>
+      `).join('')
+    : `<div class="empty-state">No leads found in the database yet.</div>`;
+
+  document.getElementById('content').innerHTML = `
+    <div class="stat-strip">
+      <div class="stat-cell">
+        <div class="grade-label">Total Leads</div>
+        <div class="grade-value">${data.total_leads || 0}</div>
+        <div class="grade-sub">all-time enquiries</div>
+      </div>
+      <div class="stat-cell">
+        <div class="grade-label">Trial Bookings</div>
+        <div class="grade-value accent">${data.total_bookings || 0}</div>
+        <div class="grade-sub">confirmed classes</div>
+      </div>
+      <div class="stat-cell">
+        <div class="grade-label">Conversion Rate</div>
+        <div class="grade-value gold">${data.conversion_rate_percent || 0}%</div>
+        <div class="grade-sub">lead → booking</div>
+      </div>
+      <div class="stat-cell">
+        <div class="grade-label">In Pipeline</div>
+        <div class="grade-value">${(data.leads_by_stage?.new || 0) + (data.leads_by_stage?.qualified || 0)}</div>
+        <div class="grade-sub">still deciding</div>
+      </div>
+    </div>
+
+    <div class="panels">
+      <div class="panel">
+        <h2>Most Requested Subjects <span class="tag">Top 10</span></h2>
+        ${subjectsHTML}
+      </div>
+      <div class="panel">
+        <h2>Recent Enquiries <span class="tag">Latest 5</span></h2>
+        ${leadsHTML}
+      </div>
+    </div>
+
+    <div class="footer-note">
+      <div class="pulse-dot"></div>
+      TUTOR0 AI · System Online · Auto-refreshes every 60s
+    </div>
+  `;
+
+  // Trigger CSS animations for the bars after a tiny delay
+  setTimeout(() => {
+    document.querySelectorAll('.bar-fill').forEach(bar => {
+      bar.style.width = bar.getAttribute('data-width');
+    });
+  }, 50);
+}
+
+// Initial load
+loadStats();
+
+// Auto-refresh every 60 seconds
+clearInterval(refreshInterval);
+refreshInterval = setInterval(loadStats, 60000);
+</script>
+
+</body>
+</html>

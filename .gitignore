@@ -10,5 +10,5 @@ venv/
 dist/
 build/
 app/credentials/
-knowledge_base/index/
-*.faiss
+!knowledge_base/index/index.faiss
+!knowledge_base/index/index.pkl

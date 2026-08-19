@@ -9,7 +9,8 @@ from pathlib import Path
 
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
-from langchain_community.embeddings import HuggingFaceEmbeddings
+# Updated to use the modern, officially supported Hugging Face integration
+from langchain_huggingface import HuggingFaceEmbeddings
 
 # ── Paths ────────────────────────────────────────────────────────────────────
 BASE_DIR   = Path(__file__).resolve().parent.parent.parent
@@ -69,6 +70,7 @@ def get_vectorstore() -> FAISS:
     embeddings = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)
     index_path = str(INDEX_DIR)
 
+    # In production on Railway, this should always exist because we committed it to Git.
     if not (INDEX_DIR / "index.faiss").exists():
         print("⚠️  No FAISS index found — building now...")
         _vectorstore = build_index()

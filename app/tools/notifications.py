@@ -52,7 +52,7 @@ def notify_new_booking(parent_name: str, student_name: str, phone: str, subjects
         f"Phone: {phone}\n"
         f"Subjects: {subjects}\n"
         f"Slot: {slot_label}\n\n"
-        f"Booked via EduBot WhatsApp"
+        f"Booked via tutoro WhatsApp"
     )
     notify_admin(message)
 
@@ -65,6 +65,6 @@ def notify_cancellation(parent_name: str, student_name: str, phone: str, slot_la
         f"Student: {student_name}\n"
         f"Phone: {phone}\n"
         f"Was scheduled: {slot_label}\n\n"
-        f"Cancelled via EduBot WhatsApp"
+        f"Cancelled via tutoro WhatsApp"
     )
     notify_admin(message)

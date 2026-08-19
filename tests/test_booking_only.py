@@ -44,7 +44,7 @@ async def main():
 
     print(f"👤 User: 1")
     reply = await run_agent(PHONE, "1", PRESEEDED_HISTORY)
-    print(f"🤖 EduBot: {reply}")
+    print(f"🤖 tutoro: {reply}")
 
     print("\n" + "="*40)
     print("✅ Test done — check above for real booking confirmation")
