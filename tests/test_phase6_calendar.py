@@ -6,7 +6,7 @@ from pathlib import Path
 sys.stdout.reconfigure(line_buffering=True)
 
 print("\n" + "=" * 55)
-print("🚀 TUTOR0 AI — Phase 6 Google Calendar Test")
+print("🚀 TUTORO AI — Phase 6 Google Calendar Test")
 print("=" * 55)
 
 # Setup root path

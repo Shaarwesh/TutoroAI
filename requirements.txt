@@ -36,3 +36,4 @@ pydantic-settings==2.6.1
 httpx==0.27.2
 fastembed
 sentry-sdk
+jinja2==3.1.4

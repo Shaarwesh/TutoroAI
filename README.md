@@ -4,7 +4,7 @@
 
 **TUTORO AI** is an autonomous AI agent that operates on WhatsApp to handle the full customer journey for a tuition centre — from the first enquiry to a confirmed trial class booking — without any human involvement.
 
-Rather than a simple FAQ chatbot, TUTOR0 AI combines **lead qualification, bilingual conversation, RAG-grounded question answering, Google Calendar booking, and a real-time admin dashboard** to replace the manual WhatsApp management that small tuition businesses currently do by hand.
+Rather than a simple FAQ chatbot, TUTORO AI combines **lead qualification, bilingual conversation, RAG-grounded question answering, Google Calendar booking, and a real-time admin dashboard** to replace the manual WhatsApp management that small tuition businesses currently do by hand.
 
 The agent is deployed on **WhatsApp via Twilio**, powered by **Groq (Llama 3.3 70B)** with a **LangChain agent framework**, and runs on **FastAPI** with **PostgreSQL, Redis, and Google Calendar** integrations.
 
@@ -22,7 +22,7 @@ The agent is deployed on **WhatsApp via Twilio**, powered by **Groq (Llama 3.3 7
 
 Small tuition centres in Malaysia receive constant WhatsApp enquiries about subjects, fees, class schedules, and trial bookings. Staff manually reply to every message, ask the same qualifying questions repeatedly, and manually schedule appointments — a time-consuming process prone to missed leads and delayed responses.
 
-TUTOR0 AI solves this by deploying an AI agent that handles the entire inbound sales flow autonomously, 24/7, in both English and Bahasa Malaysia — responding in the same language the customer uses.
+TUTORO AI solves this by deploying an AI agent that handles the entire inbound sales flow autonomously, 24/7, in both English and Bahasa Malaysia — responding in the same language the customer uses.
 
 The project demonstrates the practical application of agentic AI in a real business context, combining multiple production-grade integrations into a single, deployable system.
 
@@ -41,13 +41,13 @@ The project demonstrates the practical application of agentic AI in a real busin
 
 ### 🗣️ Bilingual Conversation (English + Bahasa Malaysia)
 
-TUTOR0 AI detects the language of each incoming message and responds entirely in the same language — English replies for English messages, full Bahasa Malaysia for Malay messages, with natural Manglish handling for mixed inputs.
+TUTORO AI detects the language of each incoming message and responds entirely in the same language — English replies for English messages, full Bahasa Malaysia for Malay messages, with natural Manglish handling for mixed inputs.
 
 ---
 
 ### 🧠 RAG-Grounded Knowledge Base
 
-Rather than relying on the LLM's general knowledge, TUTOR0 AI queries a **FAISS vector index** built from the tuition centre's own FAQ documents. This means:
+Rather than relying on the LLM's general knowledge, TUTORO AI queries a **FAISS vector index** built from the tuition centre's own FAQ documents. This means:
 
 * Fees and packages are always accurate (pulled from actual documents, not hallucinated)
 * Subjects offered are never fabricated — if asked about Science (not offered), the bot correctly says so
@@ -57,7 +57,7 @@ Rather than relying on the LLM's general knowledge, TUTOR0 AI queries a **FAISS 
 
 ### 📋 Full Registration Flow
 
-TUTOR0 AI guides customers through a structured registration process, collecting:
+TUTORO AI guides customers through a structured registration process, collecting:
 
 * Parent/guardian name
 * Student name
@@ -73,7 +73,7 @@ Each piece of information is saved to the database incrementally — even if the
 
 ### 📅 Real Google Calendar Booking
 
-When a customer confirms their registration, TUTOR0 AI:
+When a customer confirms their registration, TUTORO AI:
 
 1. Queries the connected Google Calendar for genuinely available trial slots
 2. Presents real slots to the customer (never fabricated times)
@@ -84,7 +84,7 @@ When a customer confirms their registration, TUTOR0 AI:
 
 ### 🔄 Cancel & Reschedule
 
-Customers can text "cancel my booking" or "I want to reschedule" at any time. TUTOR0 AI:
+Customers can text "cancel my booking" or "I want to reschedule" at any time. TUTORO AI:
 
 1. Looks up their existing booking by phone number
 2. Cancels the Google Calendar event
@@ -96,13 +96,13 @@ Customers can text "cancel my booking" or "I want to reschedule" at any time. TU
 
 ### 👨‍👩‍👧‍👦 Multi-Student Registration (Siblings)
 
-A parent registering more than one child is handled natively — the first child goes through the standard flow, and TUTOR0 AI prompts for additional children and registers each with their own subjects and form level under the same parent record.
+A parent registering more than one child is handled natively — the first child goes through the standard flow, and TUTORO AI prompts for additional children and registers each with their own subjects and form level under the same parent record.
 
 ---
 
 ### ⏳ Waitlist Handling
 
-When no trial slots are available in the next 7 days, TUTOR0 AI offers to add the customer to a waitlist rather than simply turning them away, capturing leads that would otherwise be lost.
+When no trial slots are available in the next 7 days, TUTORO AI offers to add the customer to a waitlist rather than simply turning them away, capturing leads that would otherwise be lost.
 
 ---
 
@@ -364,7 +364,7 @@ ngrok http 8000
 
 ## 🧪 Testing
 
-TUTOR0 AI was tested across all major functional modules:
+TUTORO AI was tested across all major functional modules:
 
 | Test | File | What it validates |
 | --- | --- | --- |

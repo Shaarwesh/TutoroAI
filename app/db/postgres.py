@@ -15,17 +15,17 @@ AsyncSessionLocal = async_sessionmaker(
     expire_on_commit=False,
 )
 
-
 class Base(DeclarativeBase):
     pass
 
-
 async def init_db():
     """Create all tables on startup if they don't exist."""
-    from app.models import lead, booking, student, waitlist  # noqa: F401 — import to register models
+    # ⬇️ Moved the schedule import here to break the circular loop ⬇️
+    from app.models import lead, booking, student, waitlist  # noqa: F401
+    from app.models.schedule import ClassSchedule
+    
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-
 
 async def get_db():
     """Dependency injection for FastAPI routes."""

@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Swesh Admin | TUTOR0 AI</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 text-gray-800">
+
+    <div class="flex h-screen">
+        <!-- Sidebar -->
+        <aside class="w-64 bg-slate-900 text-white flex flex-col">
+            <div class="p-6 text-2xl font-bold tracking-wider">SWESH</div>
+            <nav class="flex-1 px-4 space-y-2">
+                <a href="/dashboard" class="block px-4 py-2 bg-slate-800 rounded-lg">📊 Dashboard</a>
+                <a href="/timetable" class="block px-4 py-2 hover:bg-slate-800 rounded-lg">📅 Timetable</a>
+                <a href="/students" class="block px-4 py-2 hover:bg-slate-800 rounded-lg">👥 Students</a>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 p-8 overflow-y-auto">
+            <header class="flex justify-between items-center mb-8">
+                <h1 class="text-3xl font-bold">Tuition Centre Command</h1>
+                <button onclick="openModal()" class="bg-blue-600 text-white font-medium px-4 py-2 rounded-lg hover:bg-blue-700 transition">
+                    + Add New Class
+                </button>
+            </header>
+
+            <!-- Live Stats -->
+            <div class="grid grid-cols-3 gap-6 mb-8">
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                    <h3 class="text-gray-500 text-xs font-semibold uppercase tracking-wider">Total Leads / Inquiries</h3>
+                    <p class="text-4xl font-bold text-gray-900 mt-2">{{ total_leads }}</p>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                    <h3 class="text-gray-500 text-xs font-semibold uppercase tracking-wider">Active Classes</h3>
+                    <p class="text-4xl font-bold text-gray-900 mt-2">{{ total_classes }}</p>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                    <h3 class="text-gray-500 text-xs font-semibold uppercase tracking-wider">Confirmed Bookings</h3>
+                    <p class="text-4xl font-bold text-emerald-600 mt-2">{{ total_bookings }}</p>
+                </div>
+            </div>
+
+            <!-- Live Timetable -->
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold">Live Class Schedule</h2>
+                </div>
+                
+                <table class="min-w-full text-left text-sm">
+                    <thead>
+                        <tr class="text-gray-500 border-b">
+                            <th class="pb-2">ID</th>
+                            <th class="pb-2">Subject</th>
+                            <th class="pb-2">Form / Year</th>
+                            <th class="pb-2">Day</th>
+                            <th class="pb-2">Time</th>
+                            <th class="pb-2">Capacity</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-gray-700">
+                        {% if schedules %}
+                            {% for class in schedules %}
+                            <tr class="border-b last:border-none">
+                                <td class="py-3 text-gray-400 font-mono text-xs">#{{ class.id }}</td>
+                                <td class="py-3 font-semibold">{{ class.subject }}</td>
+                                <td class="py-3">{{ class.form_year }}</td>
+                                <td class="py-3">{{ class.day_of_week }}</td>
+                                <td class="py-3">{{ class.start_time }} - {{ class.end_time }}</td>
+                                <td class="py-3">
+                                    <span class="bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full text-xs font-bold">
+                                        {{ class.current_enrolled }} / {{ class.max_capacity }}
+                                    </span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="6" class="py-6 text-center text-gray-400 italic">No classes scheduled yet. Click "+ Add New Class" above to create one.</td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal Form for Adding New Class -->
+    <div id="classModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl">
+            <div class="flex justify-between items-center mb-4 border-b pb-3">
+                <h3 class="text-lg font-bold text-gray-900">Add New Class Schedule</h3>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-xl font-bold">&times;</button>
+            </div>
+
+            <form id="addClassForm" onsubmit="submitClass(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Subject</label>
+                    <select id="subject" required class="w-full border rounded-lg p-2.5 text-sm bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="Mathematics">Mathematics</option>
+                        <option value="English">English</option>
+                        <option value="Bahasa Melayu">Bahasa Melayu</option>
+                        <option value="History">History</option>
+                        <option value="Geography">Geography</option>
+                        <option value="RBT">RBT</option>
+                    </select>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">Form / Level</label>
+                        <select id="form_year" required class="w-full border rounded-lg p-2.5 text-sm bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="Form 1">Form 1</option>
+                            <option value="Form 2">Form 2</option>
+                            <option value="Form 3">Form 3</option>
+                            <option value="Form 4">Form 4</option>
+                            <option value="Form 5">Form 5</option>
+                            <option value="Standard 6">Standard 6</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">Day of Week</label>
+                        <select id="day_of_week" required class="w-full border rounded-lg p-2.5 text-sm bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="Saturday">Saturday</option>
+                            <option value="Sunday">Sunday</option>
+                            <option value="Monday">Monday</option>
+                            <option value="Tuesday">Tuesday</option>
+                            <option value="Wednesday">Wednesday</option>
+                            <option value="Thursday">Thursday</option>
+                            <option value="Friday">Friday</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">Start Time</label>
+                        <input type="text" id="start_time" placeholder="e.g. 10:00 AM" required class="w-full border rounded-lg p-2.5 text-sm bg-gray-50 focus:bg-white focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">End Time</label>
+                        <input type="text" id="end_time" placeholder="e.g. 11:30 AM" required class="w-full border rounded-lg p-2.5 text-sm bg-gray-50 focus:bg-white focus:outline-none">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Max Capacity</label>
+                    <input type="number" id="max_capacity" value="15" required class="w-full border rounded-lg p-2.5 text-sm bg-gray-50 focus:bg-white focus:outline-none">
+                </div>
+
+                <div class="flex justify-end space-x-3 pt-3 border-t">
+                    <button type="button" onclick="closeModal()" class="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg">Cancel</button>
+                    <button type="submit" class="px-4 py-2 text-sm bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700">Save Class</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function openModal() {
+            const modal = document.getElementById('classModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('classModal');
+            modal.classList.remove('flex');
+            modal.classList.add('hidden');
+        }
+
+        async function submitClass(e) {
+            e.preventDefault();
+            const data = {
+                subject: document.getElementById('subject').value,
+                form_year: document.getElementById('form_year').value,
+                day_of_week: document.getElementById('day_of_week').value,
+                start_time: document.getElementById('start_time').value,
+                end_time: document.getElementById('end_time').value,
+                max_capacity: parseInt(document.getElementById('max_capacity').value)
+            };
+
+            try {
+                const res = await fetch('/admin/schedule', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                if (res.ok) {
+                    window.location.reload();
+                } else {
+                    alert('Failed to add class.');
+                }
+            } catch (err) {
+                alert('Network error adding class.');
+            }
+        }
+    </script>
+</body>
+</html>

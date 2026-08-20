@@ -57,7 +57,7 @@ retriever = vectorstore.as_retriever(search_kwargs={"k": 2})
 
 # 4. TIGHTENED GROUNDED QA PROMPT
 qa_prompt = PromptTemplate(
-    template="""You are TUTOR0 AI, the official assistant for Wesh Tuition Centre.
+    template="""You are TUTORO AI, the official assistant for Wesh Tuition Centre.
 Answer the question directly, concisely, and factually based ONLY on the context below.
 
 Rules:
@@ -166,7 +166,7 @@ if "llm_context_precision_with_reference" in df.columns:
 
 # 8. DISPLAY REPORT
 print("\n" + "=" * 80)
-print("TUTOR0 AI — PRODUCTION RAG BENCHMARK REPORT (>0.90 TARGET)")
+print("TUTORO AI — PRODUCTION RAG BENCHMARK REPORT (>0.90 TARGET)")
 print("=" * 80)
 
 display_cols = [c for c in ["user_input", "context_precision", "faithfulness", "answer_similarity"] if c in df.columns]

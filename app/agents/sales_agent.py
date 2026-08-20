@@ -1,6 +1,6 @@
 """
-TUTOR0 AI Sales Agent — Phase 5 v9
-Optimized: Added rich post-booking confirmation receipt for professional closure.
+TUTORO AI Sales Agent — Phase 6
+Optimized: Fully integrated with PostgreSQL Database Timetable. GCal deprecated.
 """
 from langchain_groq import ChatGroq
 from langchain.agents import AgentExecutor, create_tool_calling_agent
@@ -10,6 +10,7 @@ from langchain_core.messages import HumanMessage, AIMessage
 
 from app.config import settings
 from app.tools.knowledge_base import query_knowledge_base as _query_kb
+from app.tools.schedule_tool import get_database_schedule
 
 import logging
 import asyncio
@@ -19,11 +20,11 @@ from datetime import datetime, timezone
 logger = logging.getLogger(__name__)
 
 # ── SYSTEM PROMPT OVERHAUL FOR METRIC EXCELLENCE & LOW LATENCY ────────────────
-SYSTEM_PROMPT = """TUTOR0 AI — Official Sales & Registration Agent for Wesh Tuition Centre, Melaka.
+SYSTEM_PROMPT = """TUTORO AI — Official Sales & Registration Agent for Wesh Tuition Centre, Melaka.
 
 ROLE & PERSONALITY:
-You are an expert, highly professional sales conversational agent on WhatsApp. 
-Your goal is to guide parents through querying information, saving their registration details, and booking a trial class.
+You are TUTORO AI, the official customer service and sales agent for Wesh Tuition Centre.
+You are professional, friendly, and highly persuasive. Your goal is to provide accurate information and secure trial class bookings.
 
 CORE BEHAVIOR RULES (CRITICAL FOR PRODUCTION EVALUATION):
 1. ZERO HALLUCINATION (100% Faithfulness): You must answer questions using ONLY the facts retrieved from 'query_knowledge_base'. If a subject, class schedule, or specific discount is NOT explicitly stated in the context, you MUST explicitly state that it is not offered or unavailable. Never invent prices, dates, or terms.
@@ -60,7 +61,19 @@ STEP-BY-STEP DATA COLLECTION FLOW (If details are missing, collect incrementally
    Phone: [num] | Email: [email] | Address: [addr]
    Subjects: [subj] | Fee: RM[calculated amt]
    Ask them to reply 'CONFIRM' or 'CANCEL'.
-9. Upon 'CONFIRM', transition to checking available slots using `check_availability` and booking via `book_trial`.
+9. Upon 'CONFIRM', transition to checking available slots using `check_available_classes` and booking via `book_trial` using the provided Class ID.
+
+LANGUAGE RULE:
+You MUST reply in the exact same language the user uses.
+- If they speak English, reply in English.
+- If they speak Malay (Bahasa Melayu), reply in Malay.
+- If they use "Manglish" (a mix of English and Malay), you must reply naturally in Manglish.
+
+FORMATTING RULE:
+Never send long paragraphs. You must use WhatsApp's native formatting to make your messages highly readable and structured:
+- Use bullet points (-) for lists, packages, and features.
+- Use *bold* for emphasis on key terms (e.g., *RM50*, *Trial Class*).
+- Use spacing (newlines) to separate different thoughts.
 
 OUTPUT CONSTRAINT:
 Every time you execute a tool call, you MUST append a friendly, clear, non-empty text response back to the user explaining what was done or what step is next. Never leave an output message blank.
@@ -69,9 +82,8 @@ HUMAN HANDOFF PROTOCOL:
 If a parent expresses deep concerns, anxiety, anger, or says things like "My son is failing" or "I am worried," DO NOT try to handle the emotional concern. Immediately call 'request_human_handoff'. Explain politely that you are transferring them to a senior teacher/admin who will assist them shortly.
 
 RESCHEDULING:
-If a user wants to reschedule, first use 'check_my_booking' to get their booking ID, then use 'check_availability' to show new slots. Once they pick a new slot number, call 'reschedule_booking'.
+If a user wants to reschedule, first use 'check_my_booking' to get their booking ID, then use 'check_available_classes' to show new slots. Once they pick a new Class ID, call 'reschedule_booking'.
 """
-
 
 # ── DB helper: fresh connection per call ──────────────────────────────────────
 def _db_run(coro):
@@ -82,7 +94,6 @@ def _db_run(coro):
     except Exception as e:
         logger.error(f"DB error: {e}")
         raise
-
 
 async def _get_lead(phone: str):
     from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
@@ -97,7 +108,6 @@ async def _get_lead(phone: str):
             return result.scalar_one_or_none()
     finally:
         await engine.dispose()
-
 
 async def _save_lead_async(phone, name, child_name, child_age, subjects, email, address, language, stage):
     from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
@@ -132,8 +142,7 @@ async def _save_lead_async(phone, name, child_name, child_age, subjects, email, 
     finally:
         await engine.dispose()
 
-
-async def _save_booking_async(phone, subjects, slot_note, google_event_id=None):
+async def _save_booking_async(phone, subjects, slot_note):
     from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
     from sqlalchemy import select
     from app.models.lead import Lead
@@ -152,8 +161,7 @@ async def _save_booking_async(phone, subjects, slot_note, google_event_id=None):
                 booking = Booking(
                     lead_id=lead.id, phone=phone,
                     appointment_start=now, appointment_end=now,
-                    subjects=subjects, notes=slot_note, status="confirmed",
-                    google_event_id=google_event_id,
+                    subjects=subjects, notes=slot_note, status="confirmed"
                 )
                 db.add(booking)
                 await db.commit()
@@ -168,14 +176,9 @@ def query_knowledge_base(question: str) -> str:
     """Search Wesh Tuition Centre's knowledge base for fees, subjects, schedule, and policies."""
     return _query_kb(question)
 
-
 @tool
 def get_lead_info(phone: str) -> str:
-    """
-    Check if this customer has registered before.
-    Call this at the start of registration to detect returning customers.
-    Use the customer's WhatsApp phone number (e.g. whatsapp:+60123456789).
-    """
+    """Check if this customer has registered before."""
     try:
         lead = _db_run(_get_lead(phone))
         if not lead:
@@ -189,24 +192,13 @@ def get_lead_info(phone: str) -> str:
         logger.error(f"get_lead_info error: {e}")
         return "NEW_CUSTOMER"
 
-
 @tool
 def save_lead(
-    phone: str,
-    parent_name: Optional[str] = None,
-    child_name: Optional[str] = None,
-    child_age: Optional[int] = None,
-    subjects: Optional[str] = None,
-    email: Optional[str] = None,
-    address: Optional[str] = None,
-    language: Optional[str] = "en",
-    stage: Optional[str] = "new",
+    phone: str, parent_name: Optional[str] = None, child_name: Optional[str] = None,
+    child_age: Optional[int] = None, subjects: Optional[str] = None, email: Optional[str] = None,
+    address: Optional[str] = None, language: Optional[str] = "en", stage: Optional[str] = "new",
 ) -> str:
-    """
-    Save/update lead. Call after CONFIRM or CANCEL (save regardless).
-    phone: use exact {phone} context value, never a number typed in chat.
-    child_age: form/year as int. stage: 'confirmed'/'cancelled'/'qualified'/'new'.
-    """
+    """Save/update lead data to PostgreSQL."""
     try:
         _db_run(_save_lead_async(phone, parent_name, child_name, child_age, subjects, email, address, language, stage))
         return f"Saved. Stage: {stage}."
@@ -214,73 +206,27 @@ def save_lead(
         logger.error(f"save_lead error: {e}")
         return f"Save failed: {e}"
 
-
 @tool
-def check_availability(phone: str, preferred_day: Optional[str] = None) -> str:
-    """Show REAL available trial class slots from Google Calendar. Call after customer confirms registration.
-    phone: use exact {phone} context value.
-    """
+def check_available_classes(subject_requested: Optional[str] = None) -> str:
+    """Fetch REAL available tuition classes from the PostgreSQL database timetable."""
     try:
-        from app.tools.calendar_tool import get_available_slots, format_slots_message
-        from app.db.redis_client import save_user_slots
-        slots = get_available_slots(days_ahead=7, max_slots=4)
-        if not slots:
-            return (
-                "No trial slots available in the next 7 days. "
-                "Would you like to join our waitlist? We'll notify you as soon as a slot opens up. "
-                "If yes, call join_waitlist with their details."
-            )
-        
-        # Persist slots into Redis keyed by phone number
-        save_user_slots(phone, slots)
-        return format_slots_message(slots)
+        return _db_run(get_database_schedule(subject_requested))
     except Exception as e:
-        logger.error(f"check_availability error: {e}")
-        return "Sorry, I couldn't check the calendar right now. Please try again shortly."
-
+        logger.error(f"check_available_classes error: {e}")
+        return "Sorry, I couldn't check the schedule right now."
 
 @tool
-def book_trial(phone: str, parent_name: str, student_name: str, slot_number: int, subjects: Optional[str] = "Not specified") -> str:
-    """
-    Book trial using slot_number from check_availability's list. Never invent a slot.
-    phone: use exact {phone} context value.
-    """
+def book_trial(phone: str, parent_name: str, student_name: str, class_id: int, subjects: Optional[str] = "Not specified") -> str:
+    """Book a trial class using the Class ID from the check_available_classes list."""
     try:
-        from app.tools.calendar_tool import create_calendar_event
-        from app.db.redis_client import get_user_slots, clear_user_slots
-        
-        # Retrieve slots securely from Redis
-        slots = get_user_slots(phone)
-        if not slots or slot_number < 1 or slot_number > len(slots):
-            return "That slot number is no longer valid or has expired. Please call check_availability again and pick a valid number."
+        _db_run(_save_booking_async(phone, subjects or "Not specified", f"Trial Class ID: {class_id}"))
 
-        chosen = slots[slot_number - 1]
-        event_id = create_calendar_event(
-            student_name=student_name,
-            parent_name=parent_name,
-            phone=phone,
-            subjects=subjects or "Not specified",
-            start=chosen["start"],
-            end=chosen["end"],
-        )
-        _db_run(_save_booking_async(phone, subjects or "Not specified", f"Trial: {chosen['label']}", event_id))
-
-        # Clear Redis slot cache for this specific user after successful booking
-        clear_user_slots(phone)
-
-        try:
-            from app.tools.notifications import notify_new_booking
-            notify_new_booking(parent_name, student_name, phone, subjects or "Not specified", chosen["label"])
-        except Exception as notify_err:
-            logger.error(f"Admin notification failed (non-fatal): {notify_err}")
-
-        # Structured, rich post-booking confirmation
         return (
             f"🎉 *TRIAL CLASS CONFIRMED!*\n\n"
             f"Thank you, {parent_name}! Here are your booking details:\n\n"
             f"👤 *Student:* {student_name}\n"
             f"📚 *Subject(s):* {subjects or 'Not specified'}\n"
-            f"📅 *Date & Time:* {chosen['label']}\n\n"
+            f"📅 *Class ID:* {class_id}\n\n"
             f"📍 *Location:* Wesh Tuition Centre, Melaka\n"
             f"📌 *Reminder:* Please arrive 10 minutes early. Don't forget to bring a notebook and stationery!\n\n"
             f"We will send you a reminder closer to the date. Let us know if you have any questions. See you soon! 😊"
@@ -288,118 +234,6 @@ def book_trial(phone: str, parent_name: str, student_name: str, slot_number: int
     except Exception as e:
         logger.error(f"book_trial error: {e}")
         return f"Booking failed: {e}"
-
-
-async def _add_waitlist_async(phone: str, parent_name: str, student_name: str, subjects: str, preferred_day: str = None):
-    from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-    from app.models.waitlist import Waitlist
-
-    engine = create_async_engine(settings.database_url, echo=False)
-    Session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-    try:
-        async with Session() as db:
-            entry = Waitlist(
-                phone=phone, parent_name=parent_name, student_name=student_name,
-                subjects=subjects, preferred_day=preferred_day,
-            )
-            db.add(entry)
-            await db.commit()
-            return entry
-    finally:
-        await engine.dispose()
-
-
-@tool
-def join_waitlist(phone: str, parent_name: str, student_name: str, subjects: str, preferred_day: Optional[str] = None) -> str:
-    """
-    Add customer to the waitlist when check_availability found no open slots.
-    They'll be notified when a slot opens up.
-    """
-    try:
-        _db_run(_add_waitlist_async(phone, parent_name, student_name, subjects, preferred_day))
-        return "You've been added to the waitlist! We'll message you as soon as a trial slot opens up. 😊"
-    except Exception as e:
-        logger.error(f"join_waitlist error: {e}")
-        return f"Couldn't add you to the waitlist: {e}"
-
-
-async def _add_student_async(phone: str, name: str, form_year: str = None, subjects: str = None):
-    from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-    from sqlalchemy import select
-    from app.models.lead import Lead
-    from app.models.student import Student
-
-    engine = create_async_engine(settings.database_url, echo=False)
-    Session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-    try:
-        async with Session() as db:
-            result = await db.execute(select(Lead).where(Lead.phone == phone))
-            lead = result.scalar_one_or_none()
-            if not lead:
-                return None
-            student = Student(lead_id=lead.id, name=name, form_year=form_year, subjects=subjects)
-            db.add(student)
-            await db.commit()
-            await db.refresh(student)
-            return student
-    finally:
-        await engine.dispose()
-
-
-async def _get_students_async(phone: str):
-    from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-    from sqlalchemy import select
-    from app.models.lead import Lead
-    from app.models.student import Student
-
-    engine = create_async_engine(settings.database_url, echo=False)
-    Session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-    try:
-        async with Session() as db:
-            result = await db.execute(select(Lead).where(Lead.phone == phone))
-            lead = result.scalar_one_or_none()
-            if not lead:
-                return []
-            result = await db.execute(select(Student).where(Student.lead_id == lead.id))
-            return result.scalars().all()
-    finally:
-        await engine.dispose()
-
-
-@tool
-def add_sibling(phone: str, student_name: str, form_year: str, subjects: str) -> str:
-    """
-    Register an ADDITIONAL child (sibling) under the same parent.
-    Use this when the customer says they want to register more than one child.
-    """
-    try:
-        result = _db_run(_add_student_async(phone, student_name, form_year, subjects))
-        if result is None:
-            return "Couldn't add sibling — parent record not found. Please complete initial registration first."
-        return f"Added {student_name} ({form_year}) as an additional student."
-    except Exception as e:
-        logger.error(f"add_sibling error: {e}")
-        return f"Failed to add sibling: {e}"
-
-
-@tool
-def list_my_children(phone: str) -> str:
-    """
-    List all children registered under this parent's phone number, including siblings.
-    phone: use exact {phone} context value.
-    """
-    try:
-        students = _db_run(_get_students_async(phone))
-        if not students:
-            return "No additional children found. Only the primary registration exists."
-        lines = ["Registered children:"]
-        for s in students:
-            lines.append(f"- {s.name} ({s.form_year}) — Subjects: {s.subjects}")
-        return "\n".join(lines)
-    except Exception as e:
-        logger.error(f"list_my_children error: {e}")
-        return "Couldn't retrieve children list right now."
-
 
 async def _get_bookings_async(phone: str):
     from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
@@ -413,7 +247,6 @@ async def _get_bookings_async(phone: str):
     finally:
         await engine.dispose()
 
-
 async def _cancel_booking_async(booking_id: int):
     from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
     from app.db.crud_booking import cancel_booking
@@ -426,13 +259,9 @@ async def _cancel_booking_async(booking_id: int):
     finally:
         await engine.dispose()
 
-
 @tool
 def check_my_booking(phone: str) -> str:
-    """
-    Look up the customer's existing booking(s) by phone number.
-    Use this when customer asks to cancel or reschedule, or wants to check their booking.
-    """
+    """Look up the customer's existing booking(s) by phone number."""
     try:
         bookings = _db_run(_get_bookings_async(phone))
         active = [b for b in bookings if b.status == "confirmed"]
@@ -446,96 +275,39 @@ def check_my_booking(phone: str) -> str:
         logger.error(f"check_my_booking error: {e}")
         return "Sorry, couldn't check your bookings right now."
 
-
-@tool
-def cancel_my_booking(booking_id: int, phone: str, parent_name: str = "Customer", student_name: str = "") -> str:
-    """
-    Cancel a booking by its ID (get this from check_my_booking first).
-    Cancels both the Google Calendar event and updates the database record.
-    """
-    try:
-        bookings = _db_run(_get_bookings_async(phone))
-        target = next((b for b in bookings if b.id == booking_id), None)
-        if not target:
-            return "Booking not found for that ID."
-
-        if target.google_event_id:
-            from app.tools.calendar_tool import cancel_calendar_event
-            cancel_calendar_event(target.google_event_id)
-
-        _db_run(_cancel_booking_async(booking_id))
-
-        try:
-            from app.tools.notifications import notify_cancellation
-            notify_cancellation(parent_name, student_name, phone, target.notes or "")
-        except Exception as notify_err:
-            logger.error(f"Cancellation notification failed (non-fatal): {notify_err}")
-
-        return "Your booking has been cancelled. Let us know if you'd like to book a new trial class!"
-    except Exception as e:
-        logger.error(f"cancel_my_booking error: {e}")
-        return f"Cancellation failed: {e}"
-
-
 @tool
 def request_human_handoff(phone: str, reason: str) -> str:
-    """
-    Triggers when a parent has a complex, emotional, or highly specific concern.
-    Pauses the AI so a human admin can take over the WhatsApp chat.
-    phone: use exact {phone} context value.
-    """
+    """Triggers when a parent has a complex, emotional, or highly specific concern."""
     try:
         from app.db.redis_client import pause_bot
-        # Run the async pause_bot in our sync DB runner
         _db_run(pause_bot(phone))
-        
         logger.warning(f"🚨 HUMAN HANDOFF REQUESTED for {phone}. Reason: {reason}")
-        
         return "Please inform the user that their concern is very important, and you are transferring them to a human coordinator who will reply to this chat shortly."
     except Exception as e:
         logger.error(f"Handoff error: {e}")
         return "Handoff failed, but tell the user someone will contact them."
 
-
 @tool
-def reschedule_booking(phone: str, booking_id: int, new_slot_number: int, parent_name: str, student_name: str) -> str:
-    """
-    Reschedules an existing booking in one step. 
-    You MUST call check_my_booking and check_availability first!
-    """
+def reschedule_booking(phone: str, booking_id: int, new_class_id: int, parent_name: str, student_name: str) -> str:
+    """Reschedules an existing booking to a new class ID in one step."""
     try:
-        from app.tools.calendar_tool import cancel_calendar_event
-        from app.db.redis_client import get_user_slots
-        
-        # 1. Get the new slot details from Redis
-        slots = get_user_slots(phone)
-        if not slots or new_slot_number < 1 or new_slot_number > len(slots):
-            return "Invalid slot number. Please ask them to pick a valid number from the availability list."
-        chosen_slot = slots[new_slot_number - 1]
-
-        # 2. Get the old booking
         bookings = _db_run(_get_bookings_async(phone))
         target_booking = next((b for b in bookings if b.id == booking_id), None)
         if not target_booking:
             return "Could not find the original booking to reschedule."
 
-        # 3. Cancel the old Google Calendar event
-        if target_booking.google_event_id:
-            cancel_calendar_event(target_booking.google_event_id)
         _db_run(_cancel_booking_async(booking_id))
 
-        # 4. Book the new slot (reusing existing book_trial logic)
         return book_trial.invoke({
             "phone": phone, 
             "parent_name": parent_name, 
             "student_name": student_name, 
-            "slot_number": new_slot_number, 
+            "class_id": new_class_id, 
             "subjects": target_booking.subjects
         })
     except Exception as e:
         logger.error(f"reschedule_booking error: {e}")
         return f"Rescheduling failed: {e}"
-
 
 # ── Agent ─────────────────────────────────────────────────────────────────────
 
@@ -543,13 +315,12 @@ def _build_agent() -> AgentExecutor:
     llm = ChatGroq(
         api_key=settings.groq_api_key,
         model="openai/gpt-oss-120b",
-        temperature=0.0,  # Dropped to 0 for strict structural alignment
+        temperature=0.0,
         max_tokens=450,
     )
     tools = [
-        query_knowledge_base, get_lead_info, save_lead, check_availability, book_trial,
-        check_my_booking, cancel_my_booking, add_sibling, list_my_children, join_waitlist,
-        request_human_handoff, reschedule_booking
+        query_knowledge_base, get_lead_info, save_lead, check_available_classes, book_trial,
+        check_my_booking, request_human_handoff, reschedule_booking
     ]
     prompt = ChatPromptTemplate.from_messages([
         ("system", SYSTEM_PROMPT),
@@ -560,7 +331,6 @@ def _build_agent() -> AgentExecutor:
     agent = create_tool_calling_agent(llm, tools, prompt)
     return AgentExecutor(agent=agent, tools=tools, verbose=True, max_iterations=6, handle_parsing_errors=True)
 
-
 _agent_executor: AgentExecutor | None = None
 
 def get_agent() -> AgentExecutor:
@@ -568,9 +338,6 @@ def get_agent() -> AgentExecutor:
     if _agent_executor is None:
         _agent_executor = _build_agent()
     return _agent_executor
-
-
-# ── Entry point ───────────────────────────────────────────────────────────────
 
 async def run_agent(user_phone: str, user_message: str, history: list[dict]) -> str:
     agent = get_agent()
@@ -591,27 +358,9 @@ async def run_agent(user_phone: str, user_message: str, history: list[dict]) -> 
             })
         )
         output = result.get("output", "").strip()
-        
-        # Intercept and eliminate blank or empty agent text fields
         if not output:
             return "Terima kasih! Maklumat anda telah diproses. Sila nyatakan subjek pilihan atau taip 'CONFIRM' untuk meneruskan. 😊"
-            
         return output
     except Exception as e:
         logger.error(f"Agent error: {e}")
-        if "Failed to call a function" in str(e) or "parsing" in str(e).lower():
-            try:
-                fallback_llm = ChatGroq(
-                    api_key=settings.groq_api_key, 
-                    model="openai/gpt-oss-20b", 
-                    temperature=0.0, 
-                    max_tokens=350
-                )
-                msgs = [{"role": "system", "content": SYSTEM_PROMPT}]
-                msgs += [{"role": m["role"], "content": m["content"]} for m in history]
-                msgs += [{"role": "user", "content": user_message}]
-                response = await asyncio.get_event_loop().run_in_executor(None, lambda: fallback_llm.invoke(msgs))
-                return response.content if response.content.strip() else "Maaf, sila hantar semula mesej anda."
-            except Exception as e2:
-                logger.error(f"Fallback error: {e2}")
         return "Maaf, berlaku ralat. Sila cuba lagi. 🙏\nSorry, something went wrong. Please try again."
