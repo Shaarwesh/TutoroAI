@@ -9,16 +9,16 @@ from pathlib import Path
 
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
-# Updated to use the modern, officially supported Hugging Face integration
-from langchain_huggingface import HuggingFaceEmbeddings
+# Using FastEmbed to bypass Render's 512MB RAM limit
+from langchain_community.embeddings.fastembed import FastEmbedEmbeddings
 
 # ── Paths ────────────────────────────────────────────────────────────────────
 BASE_DIR   = Path(__file__).resolve().parent.parent.parent
 DOCS_DIR   = BASE_DIR / "knowledge_base" / "docs"
 INDEX_DIR  = BASE_DIR / "knowledge_base" / "index"
 
-# ── Embedding model (same one from your APEL chatbot) ────────────────────────
-EMBEDDING_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+# ── Embedding model (Lightweight ONNX model for FastEmbed) ───────────────────
+EMBEDDING_MODEL = "BAAI/bge-small-en-v1.5"
 
 _vectorstore = None  # singleton — loaded once
 
@@ -48,8 +48,8 @@ def build_index():
     chunks = splitter.create_documents(raw_docs)
     print(f"   Created {len(chunks)} chunks")
 
-    print("🧠 Loading embedding model...")
-    embeddings = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)
+    print("🧠 Loading FastEmbed embedding model...")
+    embeddings = FastEmbedEmbeddings(model_name=EMBEDDING_MODEL)
 
     print("🔍 Building FAISS index...")
     vectorstore = FAISS.from_documents(chunks, embeddings)
@@ -67,10 +67,10 @@ def get_vectorstore() -> FAISS:
     if _vectorstore is not None:
         return _vectorstore
 
-    embeddings = HuggingFaceEmbeddings(model_name=EMBEDDING_MODEL)
+    embeddings = FastEmbedEmbeddings(model_name=EMBEDDING_MODEL)
     index_path = str(INDEX_DIR)
 
-    # In production on Railway, this should always exist because we committed it to Git.
+    # In production on Render, this should always exist because we committed it to Git.
     if not (INDEX_DIR / "index.faiss").exists():
         print("⚠️  No FAISS index found — building now...")
         _vectorstore = build_index()
