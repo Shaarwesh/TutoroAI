@@ -28,16 +28,14 @@ async def lifespan(app: FastAPI):
     """Startup and shutdown events."""
     print("🚀 TUTORO AI starting up...", flush=True)
     
-    # --- STARTUP LOGIC ---
     try:
         await init_db()
         print("✅ Database ready", flush=True)
     except Exception as e:
         print(f"⚠️  Database not available at startup: {e}", flush=True)
 
-    yield  # Uvicorn instantly opens the port here!
+    yield  
 
-    # --- SHUTDOWN LOGIC ---
     print("🛑 TUTORO AI shutting down. Cleaning up connections...", flush=True)
     
     try:
@@ -67,7 +65,6 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Pointing exactly to the app/templates directory
 templates = Jinja2Templates(directory="app/templates")
 
 app.add_middleware(
@@ -84,11 +81,9 @@ app.include_router(webhook.router, prefix="/webhook", tags=["Webhook"])
 @app.get("/dashboard", response_class=HTMLResponse)
 async def serve_dashboard(request: Request):
     async with AsyncSessionLocal() as db:
-        # Fetch live schedules
         result = await db.execute(select(ClassSchedule).order_by(ClassSchedule.id.desc()))
         schedules = result.scalars().all()
 
-        # Fetch live dynamic metrics
         lead_count = await db.scalar(select(func.count(Lead.id))) or 0
         booking_count = await db.scalar(select(func.count(Booking.id))) or 0
         total_classes = len(schedules)
@@ -121,7 +116,6 @@ async def serve_timetable(request: Request):
 @app.get("/students", response_class=HTMLResponse)
 async def serve_students(request: Request):
     async with AsyncSessionLocal() as db:
-        # Fetch all leads/students from the database, newest first
         result = await db.execute(select(Lead).order_by(Lead.id.desc()))
         leads = result.scalars().all()
 
@@ -138,25 +132,7 @@ async def health():
     return {"status": "ok", "agent": "TUTORO AI", "version": "1.0.0"}
 
 
-@app.post("/admin/send-reminders")
-async def trigger_reminders(x_admin_key: str = Header(None)):
-    if x_admin_key != settings.secret_key:
-        raise HTTPException(status_code=403, detail="Invalid admin key")
-    from app.tools.reminders import send_upcoming_reminders
-    result = await send_upcoming_reminders()
-    return {"status": "ok", **result}
-
-
-@app.get("/admin/stats")
-async def admin_stats(x_admin_key: str = Header(None)):
-    if x_admin_key != settings.secret_key:
-        raise HTTPException(status_code=403, detail="Invalid admin key")
-    from app.tools.analytics import get_analytics_summary
-    summary = await get_analytics_summary()
-    return summary
-
-
-# --- SCHEDULE API ---
+# --- SCHEDULE API (ADD, EDIT, DELETE) ---
 
 class ClassCreate(BaseModel):
     subject: str
@@ -168,7 +144,6 @@ class ClassCreate(BaseModel):
 
 @app.post("/admin/schedule")
 async def add_class_schedule(new_class: ClassCreate):
-    """Endpoint to add a new class directly from the dashboard modal."""
     async with AsyncSessionLocal() as db:
         db_class = ClassSchedule(
             subject=new_class.subject,
@@ -181,3 +156,35 @@ async def add_class_schedule(new_class: ClassCreate):
         db.add(db_class)
         await db.commit()
         return {"status": "Class added successfully!"}
+
+@app.put("/admin/schedule/{class_id}")
+async def update_class_schedule(class_id: int, updated_class: ClassCreate):
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(ClassSchedule).where(ClassSchedule.id == class_id))
+        db_class = result.scalar_one_or_none()
+        
+        if not db_class:
+            raise HTTPException(status_code=404, detail="Class not found")
+            
+        db_class.subject = updated_class.subject
+        db_class.form_year = updated_class.form_year
+        db_class.day_of_week = updated_class.day_of_week
+        db_class.start_time = updated_class.start_time
+        db_class.end_time = updated_class.end_time
+        db_class.max_capacity = updated_class.max_capacity
+        
+        await db.commit()
+        return {"status": "Class updated successfully!"}
+
+@app.delete("/admin/schedule/{class_id}")
+async def delete_class_schedule(class_id: int):
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(ClassSchedule).where(ClassSchedule.id == class_id))
+        target_class = result.scalar_one_or_none()
+        
+        if not target_class:
+            raise HTTPException(status_code=404, detail="Class not found")
+            
+        await db.delete(target_class)
+        await db.commit()
+        return {"status": "Class deleted successfully!"}
