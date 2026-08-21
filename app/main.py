@@ -1,11 +1,11 @@
 import os
+import secrets
 import sentry_sdk
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import FastAPI, Header, HTTPException, Depends, status, Request, Form
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from fastapi import Request
 from pydantic import BaseModel
 
 from sqlalchemy import select, func
@@ -13,127 +13,159 @@ from app.db.postgres import init_db, AsyncSessionLocal
 from app.models.schedule import ClassSchedule
 from app.models.lead import Lead
 from app.models.booking import Booking
+from app.models.admin import AdminUser
 from app.routers import webhook
 from app.config import settings
+from app.tools.security import verify_password, get_password_hash
+from app.tools.email_auth import send_reset_link_email
+from app.db.redis_client import _redis_async
 
-# 1. Initialize Sentry BEFORE FastAPI is created
+# --- COOKIE SECURITY LOGIC ---
+async def get_current_admin_html(request: Request):
+    """Protects web pages. Redirects to the login screen if not logged in."""
+    session_id = request.cookies.get("session_id")
+    if session_id and _redis_async:
+        username = await _redis_async.get(f"session:{session_id}")
+        if username:
+            return username.decode("utf-8")
+    
+    raise HTTPException(status_code=303, headers={"Location": "/login"})
+
+async def get_current_admin_api(request: Request):
+    """Protects behind-the-scenes API calls."""
+    session_id = request.cookies.get("session_id")
+    if session_id and _redis_async:
+        username = await _redis_async.get(f"session:{session_id}")
+        if username:
+            return username.decode("utf-8")
+            
+    raise HTTPException(status_code=401, detail="Unauthorized")
+
 if settings.sentry_dsn:
-    sentry_sdk.init(
-        dsn=settings.sentry_dsn,
-        traces_sample_rate=1.0,
-    )
+    sentry_sdk.init(dsn=settings.sentry_dsn, traces_sample_rate=1.0)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Startup and shutdown events."""
     print("🚀 TUTORO AI starting up...", flush=True)
-    
     try:
         await init_db()
         print("✅ Database ready", flush=True)
+        async with AsyncSessionLocal() as db:
+            # FORCE RESET: Find the admin and rewrite the password to swesh123
+            result = await db.execute(select(AdminUser).where(AdminUser.username == "admin"))
+            user = result.scalar_one_or_none()
+            
+            if not user:
+                db.add(AdminUser(username="admin", hashed_password=get_password_hash("swesh123")))
+            else:
+                user.hashed_password = get_password_hash("swesh123")
+                
+            await db.commit()
+            print("✅ Admin password FORCED to: swesh123", flush=True)
     except Exception as e:
-        print(f"⚠️  Database not available at startup: {e}", flush=True)
-
+        print(f"⚠️ Database error at startup: {e}", flush=True)
     yield  
+    print("🛑 TUTORO AI shutting down...", flush=True)
 
-    print("🛑 TUTORO AI shutting down. Cleaning up connections...", flush=True)
-    
-    try:
-        from app.db.postgres import engine
-        if engine:
-            await engine.dispose()
-            print("✅ PostgreSQL connection pool closed", flush=True)
-    except Exception as e:
-        print(f"⚠️  Failed to close PostgreSQL pool: {e}", flush=True)
-
-    try:
-        from app.db.redis_client import _redis_async, _redis_sync
-        if _redis_async:
-            await _redis_async.close()
-        if _redis_sync:
-            _redis_sync.close()
-        print("✅ Redis connections closed", flush=True)
-    except Exception as e:
-        print(f"⚠️  Failed to close Redis: {e}", flush=True)
-
-
-# 2. Initialize FastAPI ONCE
-app = FastAPI(
-    title="TUTORO AI — Bilingual WhatsApp Sales Agent",
-    description="Agentic AI for tuition centre lead qualification and booking",
-    version="1.0.0",
-    lifespan=lifespan,
-)
-
+app = FastAPI(title="TUTORO AI", version="1.0.0", lifespan=lifespan)
 templates = Jinja2Templates(directory="app/templates")
 
 app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
+    CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"],
 )
-
-# 3. Mount Routers
 app.include_router(webhook.router, prefix="/webhook", tags=["Webhook"])
 
-# 4. Define Endpoints
-@app.get("/dashboard", response_class=HTMLResponse)
-async def serve_dashboard(request: Request):
-    async with AsyncSessionLocal() as db:
-        result = await db.execute(select(ClassSchedule).order_by(ClassSchedule.id.desc()))
-        schedules = result.scalars().all()
+# --- AUTHENTICATION ROUTES (LOGIN / LOGOUT) ---
+@app.get("/login", response_class=HTMLResponse)
+async def login_page(request: Request):
+    return templates.TemplateResponse("login.html", {"request": request})
 
+@app.post("/login", response_class=HTMLResponse)
+async def process_login(request: Request, username: str = Form(...), password: str = Form(...)):
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(AdminUser).where(AdminUser.username == username))
+        user = result.scalar_one_or_none()
+        
+    if not user or not verify_password(password, user.hashed_password):
+        return templates.TemplateResponse("login.html", {"request": request, "error": "Invalid username or password"})
+        
+    if not _redis_async:
+        return templates.TemplateResponse("login.html", {"request": request, "error": "Redis Database is offline. Cannot save session."})
+        
+    session_id = secrets.token_urlsafe(32)
+    await _redis_async.setex(f"session:{session_id}", 86400, user.username)
+    
+    response = RedirectResponse(url="/dashboard", status_code=303)
+    response.set_cookie(key="session_id", value=session_id, httponly=True, max_age=86400)
+    return response
+
+@app.get("/logout")
+async def logout(request: Request):
+    session_id = request.cookies.get("session_id")
+    if session_id and _redis_async:
+        await _redis_async.delete(f"session:{session_id}")
+        
+    response = RedirectResponse(url="/login", status_code=303)
+    response.delete_cookie("session_id")
+    return response
+
+# --- DASHBOARD ROUTES (SECURED WITH HTML REDIRECT) ---
+@app.get("/dashboard", response_class=HTMLResponse)
+async def serve_dashboard(request: Request, admin: str = Depends(get_current_admin_html)):
+    async with AsyncSessionLocal() as db:
+        schedules = (await db.execute(select(ClassSchedule).order_by(ClassSchedule.id.desc()))).scalars().all()
         lead_count = await db.scalar(select(func.count(Lead.id))) or 0
         booking_count = await db.scalar(select(func.count(Booking.id))) or 0
-        total_classes = len(schedules)
-
     return templates.TemplateResponse(
         "dashboard.html", 
-        {
-            "request": request, 
-            "total_leads": lead_count,
-            "total_classes": total_classes,
-            "total_bookings": booking_count,
-            "schedules": schedules
-        }
+        {"request": request, "total_leads": lead_count, "total_classes": len(schedules), "total_bookings": booking_count, "schedules": schedules}
     )
 
 @app.get("/timetable", response_class=HTMLResponse)
-async def serve_timetable(request: Request):
+async def serve_timetable(request: Request, admin: str = Depends(get_current_admin_html)):
     async with AsyncSessionLocal() as db:
-        result = await db.execute(select(ClassSchedule).order_by(ClassSchedule.id.desc()))
-        schedules = result.scalars().all()
-
-    return templates.TemplateResponse(
-        "timetable.html", 
-        {
-            "request": request, 
-            "schedules": schedules
-        }
-    )
+        schedules = (await db.execute(select(ClassSchedule).order_by(ClassSchedule.id.desc()))).scalars().all()
+    return templates.TemplateResponse("timetable.html", {"request": request, "schedules": schedules})
 
 @app.get("/students", response_class=HTMLResponse)
-async def serve_students(request: Request):
+async def serve_students(request: Request, admin: str = Depends(get_current_admin_html)):
     async with AsyncSessionLocal() as db:
-        result = await db.execute(select(Lead).order_by(Lead.id.desc()))
-        leads = result.scalars().all()
+        leads = (await db.execute(select(Lead).order_by(Lead.id.desc()))).scalars().all()
+    return templates.TemplateResponse("students.html", {"request": request, "leads": leads})
 
-    return templates.TemplateResponse(
-        "students.html", 
-        {
-            "request": request,
-            "leads": leads
-        }
-    )
+# --- PASSWORD RESET ROUTES ---
+@app.get("/forgot-password", response_class=HTMLResponse)
+async def forgot_password_page(request: Request):
+    return templates.TemplateResponse("forgot_password.html", {"request": request})
 
-@app.get("/")
-async def health():
-    return {"status": "ok", "agent": "TUTORO AI", "version": "1.0.0"}
+@app.post("/admin/request-reset")
+async def request_password_reset(request: Request, email: str = Form(...)):
+    if email == settings.admin_recovery_email:
+        base_url = str(request.base_url).rstrip("/")
+        success = await send_reset_link_email(base_url)
+        if not success: raise HTTPException(status_code=500, detail="Failed to send email.")
+    return {"status": "success"}
 
+@app.get("/reset-password", response_class=HTMLResponse)
+async def reset_password_page(request: Request, token: str):
+    return templates.TemplateResponse("reset_password.html", {"request": request, "token": token})
 
-# --- SCHEDULE API (ADD, EDIT, DELETE) ---
+@app.post("/admin/reset-password")
+async def process_new_password(token: str = Form(...), new_password: str = Form(...)):
+    if not _redis_async: raise HTTPException(status_code=500, detail="Database error.")
+    redis_key = f"reset_token:{token}"
+    if not await _redis_async.get(redis_key): raise HTTPException(status_code=400, detail="Invalid token.")
+    
+    async with AsyncSessionLocal() as db:
+        user = (await db.execute(select(AdminUser).where(AdminUser.username == "admin"))).scalar_one_or_none()
+        if not user: raise HTTPException(status_code=404, detail="Admin not found.")
+        user.hashed_password = get_password_hash(new_password)
+        await db.commit()
+        
+    await _redis_async.delete(redis_key)
+    return {"status": "success"}
 
+# --- SCHEDULE API (SECURED WITH API 401 ERROR) ---
 class ClassCreate(BaseModel):
     subject: str
     form_year: str
@@ -143,48 +175,26 @@ class ClassCreate(BaseModel):
     max_capacity: int = 15
 
 @app.post("/admin/schedule")
-async def add_class_schedule(new_class: ClassCreate):
+async def add_class_schedule(new_class: ClassCreate, admin: str = Depends(get_current_admin_api)):
     async with AsyncSessionLocal() as db:
-        db_class = ClassSchedule(
-            subject=new_class.subject,
-            form_year=new_class.form_year,
-            day_of_week=new_class.day_of_week,
-            start_time=new_class.start_time,
-            end_time=new_class.end_time,
-            max_capacity=new_class.max_capacity
-        )
-        db.add(db_class)
+        db.add(ClassSchedule(**new_class.dict()))
         await db.commit()
         return {"status": "Class added successfully!"}
 
 @app.put("/admin/schedule/{class_id}")
-async def update_class_schedule(class_id: int, updated_class: ClassCreate):
+async def update_class_schedule(class_id: int, updated_class: ClassCreate, admin: str = Depends(get_current_admin_api)):
     async with AsyncSessionLocal() as db:
-        result = await db.execute(select(ClassSchedule).where(ClassSchedule.id == class_id))
-        db_class = result.scalar_one_or_none()
-        
-        if not db_class:
-            raise HTTPException(status_code=404, detail="Class not found")
-            
-        db_class.subject = updated_class.subject
-        db_class.form_year = updated_class.form_year
-        db_class.day_of_week = updated_class.day_of_week
-        db_class.start_time = updated_class.start_time
-        db_class.end_time = updated_class.end_time
-        db_class.max_capacity = updated_class.max_capacity
-        
+        target = (await db.execute(select(ClassSchedule).where(ClassSchedule.id == class_id))).scalar_one_or_none()
+        if not target: raise HTTPException(status_code=404, detail="Class not found")
+        for key, value in updated_class.dict().items(): setattr(target, key, value)
         await db.commit()
         return {"status": "Class updated successfully!"}
 
 @app.delete("/admin/schedule/{class_id}")
-async def delete_class_schedule(class_id: int):
+async def delete_class_schedule(class_id: int, admin: str = Depends(get_current_admin_api)):
     async with AsyncSessionLocal() as db:
-        result = await db.execute(select(ClassSchedule).where(ClassSchedule.id == class_id))
-        target_class = result.scalar_one_or_none()
-        
-        if not target_class:
-            raise HTTPException(status_code=404, detail="Class not found")
-            
-        await db.delete(target_class)
+        target = (await db.execute(select(ClassSchedule).where(ClassSchedule.id == class_id))).scalar_one_or_none()
+        if not target: raise HTTPException(status_code=404, detail="Class not found")
+        await db.delete(target)
         await db.commit()
         return {"status": "Class deleted successfully!"}
