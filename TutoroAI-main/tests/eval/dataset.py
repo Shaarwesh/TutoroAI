@@ -136,6 +136,11 @@ CASES = [
     c("edge", "en", "How much is Maths, is Sunday open, and can I try for free?", behavior="Answers all three parts: RM50, Sunday closed, free trial", tools_any=KB),
 ]
 
+for case in CASES:
+    # facts hardcoded in the system prompt don't require a KB call; only the answer is scored
+    if case["gt"] and case["tools_any"] == KB:
+        case["tools_any"] = None
+
 for i, case in enumerate(CASES, 1):
     case["id"] = f"q{i:03d}"
 

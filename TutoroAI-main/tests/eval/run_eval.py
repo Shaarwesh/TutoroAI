@@ -80,7 +80,9 @@ def run_case(case):
 
 
 def done_ids():
-    return {json.loads(l)["id"] for l in RUNS.read_text().splitlines() if l.strip()} if RUNS.exists() else set()
+    if not RUNS.exists(): return set()
+    rows = [json.loads(l) for l in RUNS.read_text(encoding="utf-8").splitlines() if l.strip()]
+    return {r["id"] for r in rows if not r.get("error")}
 
 
 def collect(args):
@@ -88,7 +90,7 @@ def collect(args):
     if args.category: todo = [c for c in todo if c["category"] == args.category]
     if args.limit: todo = todo[: args.limit]
     print(f"{len(done_ids())} cached, running {len(todo)}")
-    with RUNS.open("a") as f:
+    with RUNS.open("a", encoding="utf-8") as f:
         for case in todo:
             try:
                 ans, calls, ctx = run_case(case)
@@ -144,11 +146,14 @@ def phone_arg_check(r):
 
 def score(args):
     import pandas as pd
-    runs = [json.loads(l) for l in RUNS.read_text().splitlines() if l.strip()]
+    runs = [json.loads(l) for l in RUNS.read_text(encoding="utf-8").splitlines() if l.strip()]
     runs = [r for r in runs if not r.get("error")]
-    cache = {j["id"]: j for j in map(json.loads, JUDGED.read_text().splitlines())} if JUDGED.exists() else {}
+    spec = {c["id"]: c for c in CASES}
+    for r in runs:
+        r.update({k: spec[r["id"]][k] for k in ("tools_any", "tools_none", "gt", "behavior")})
+    cache = {j["id"]: j for j in map(json.loads, JUDGED.read_text(encoding="utf-8").splitlines())} if JUDGED.exists() else {}
     llm = judge_llm()
-    with JUDGED.open("a") as f:
+    with JUDGED.open("a", encoding="utf-8") as f:
         for r in runs:
             if r["id"] in cache or not (r["gt"] or r["behavior"]): continue
             try: j = judge(llm, r)
