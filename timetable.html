@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Timetable | Swesh</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 text-gray-800">
+    <div class="flex h-screen">
+        <aside class="w-64 bg-slate-900 text-white flex flex-col">
+            <div class="p-6 text-2xl font-bold tracking-wider">SWESH</div>
+            <nav class="flex-1 px-4 space-y-2">
+                <a href="/dashboard" class="block px-4 py-2 hover:bg-slate-800 rounded-lg">📊 Dashboard</a>
+                <a href="/timetable" class="block px-4 py-2 bg-slate-800 rounded-lg">📅 Timetable</a>
+                <a href="/students" class="block px-4 py-2 hover:bg-slate-800 rounded-lg">👥 Students</a>
+                <a href="/analytics" class="block px-4 py-2 hover:bg-slate-800 rounded-lg">📈 Analytics</a>
+            </nav>
+        </aside>
+
+        <main class="flex-1 p-8 overflow-auto">
+            <div class="flex items-end justify-between mb-6">
+                <div>
+                    <h1 class="text-3xl font-bold">Master Timetable</h1>
+                    <p class="text-gray-500 text-sm mt-1">Live seat availability. Seats fill when a trial is booked and free up when it is cancelled.</p>
+                </div>
+                <a href="/dashboard" class="text-sm text-blue-600 hover:underline">Add / edit classes →</a>
+            </div>
+
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4"><div class="text-xs text-gray-500">Classes</div><div class="text-2xl font-bold">{{ schedules|length }}</div></div>
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4"><div class="text-xs text-gray-500">Total seats</div><div class="text-2xl font-bold">{{ seats }}</div></div>
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4"><div class="text-xs text-gray-500">Filled</div><div class="text-2xl font-bold">{{ filled }}</div></div>
+                <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-4"><div class="text-xs text-gray-500">Free</div><div class="text-2xl font-bold text-green-600">{{ seats - filled }}</div></div>
+            </div>
+
+            {% if schedules %}
+            <div class="grid gap-4" style="grid-template-columns: repeat(7, minmax(170px, 1fr));">
+                {% for day, classes in by_day.items() %}
+                <div>
+                    <div class="text-sm font-bold text-gray-600 mb-2 uppercase tracking-wide">{{ day[:3] }}</div>
+                    <div class="space-y-3">
+                    {% for c in classes %}
+                        {% set cap = c.max_capacity or 0 %}
+                        {% set n = c.current_enrolled or 0 %}
+                        {% set pct = ((n / cap * 100)|round|int) if cap else 0 %}
+                        <div class="bg-white rounded-xl shadow-sm border {{ 'border-red-200' if n >= cap and cap else 'border-gray-100' }} p-3">
+                            <div class="text-xs text-gray-500">{{ c.start_time }} – {{ c.end_time }}</div>
+                            <div class="font-semibold text-sm">{{ c.subject }}</div>
+                            <div class="text-xs text-gray-500 mb-2">{{ c.form_year }} · ID {{ c.id }}</div>
+                            <div class="h-2 bg-gray-100 rounded-full overflow-hidden">
+                                <div class="h-2 rounded-full {{ 'bg-red-500' if pct >= 100 else ('bg-amber-400' if pct >= 70 else 'bg-green-500') }}" style="width: {{ [pct, 100]|min }}%"></div>
+                            </div>
+                            <div class="text-xs mt-1 {{ 'text-red-600 font-semibold' if n >= cap and cap else 'text-gray-500' }}">
+                                {% if n >= cap and cap %}FULL{% else %}{{ n }}/{{ cap }} · {{ cap - n }} free{% endif %}
+                            </div>
+                        </div>
+                    {% else %}
+                        <div class="text-xs text-gray-300 italic">No classes</div>
+                    {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="bg-white rounded-xl border border-gray-100 p-8 text-center text-gray-500">
+                No classes yet. Run <code class="bg-gray-100 px-1 rounded">python seed_demo.py</code> or add classes from the Dashboard.
+            </div>
+            {% endif %}
+        </main>
+    </div>
+</body>
+</html>

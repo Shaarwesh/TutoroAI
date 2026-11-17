@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ lead.name or 'Student' }} | TUTORO AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 text-gray-800">
+<div class="flex h-screen">
+    <aside class="w-64 bg-slate-900 text-white flex flex-col">
+        <div class="p-6 text-2xl font-bold tracking-wider">SWESH</div>
+        <nav class="flex-1 px-4 space-y-2">
+            <a href="/dashboard" class="block px-4 py-2 hover:bg-slate-800 rounded-lg">📊 Dashboard</a>
+            <a href="/timetable" class="block px-4 py-2 hover:bg-slate-800 rounded-lg">📅 Timetable</a>
+            <a href="/students" class="block px-4 py-2 bg-slate-800 rounded-lg">👥 Students</a>
+            <a href="/analytics" class="block px-4 py-2 hover:bg-slate-800 rounded-lg">📈 Analytics</a>
+        </nav>
+    </aside>
+    <main class="flex-1 p-8 overflow-y-auto">
+        <a href="/students" class="text-sm text-blue-600 hover:underline">← Back to students</a>
+        <div class="flex items-center gap-3 mt-2 mb-6">
+            <h1 class="text-3xl font-bold">{{ lead.name or 'Unnamed' }}</h1>
+            <span class="px-3 py-1 rounded-full text-xs font-bold uppercase bg-yellow-100 text-yellow-800">{{ lead.stage }}</span>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <section class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                <h2 class="font-bold mb-4">Parent / contact</h2>
+                <dl class="grid grid-cols-3 gap-y-2 text-sm">
+                    <dt class="text-gray-500">Name</dt><dd class="col-span-2">{{ lead.name or '-' }}</dd>
+                    <dt class="text-gray-500">Phone</dt><dd class="col-span-2">{{ lead.phone }}</dd>
+                    <dt class="text-gray-500">Email</dt><dd class="col-span-2">{{ lead.email or '-' }}</dd>
+                    <dt class="text-gray-500">Address</dt><dd class="col-span-2">{{ lead.address or '-' }}</dd>
+                    <dt class="text-gray-500">Language</dt><dd class="col-span-2">{{ lead.language or '-' }}</dd>
+                    <dt class="text-gray-500">Registered</dt><dd class="col-span-2">{{ lead.created_at.strftime('%d %b %Y, %H:%M') if lead.created_at else '-' }}</dd>
+                </dl>
+            </section>
+
+            <section class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                <h2 class="font-bold mb-4">Student</h2>
+                <dl class="grid grid-cols-3 gap-y-2 text-sm">
+                    <dt class="text-gray-500">Name</dt><dd class="col-span-2">{{ lead.child_name or '-' }}</dd>
+                    <dt class="text-gray-500">Form / year</dt><dd class="col-span-2">{{ lead.child_age or '-' }}</dd>
+                    <dt class="text-gray-500">Subjects</dt><dd class="col-span-2">{{ lead.subjects or '-' }}</dd>
+                </dl>
+                {% if siblings %}
+                <h3 class="font-semibold mt-5 mb-2 text-sm">Siblings</h3>
+                <ul class="text-sm space-y-1">
+                    {% for s in siblings %}
+                    <li class="flex justify-between border-b last:border-none py-1">
+                        <span>{{ s.name }}{% if s.form_year %} · {{ s.form_year }}{% endif %}</span>
+                        <span class="text-gray-500">{{ s.subjects or '-' }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+            </section>
+        </div>
+
+        <section class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
+            <h2 class="font-bold mb-4">Trial bookings</h2>
+            {% if items %}
+            <table class="w-full text-sm">
+                <thead><tr class="text-gray-500 border-b text-left">
+                    <th class="py-2">Class</th><th class="py-2">Trial date</th><th class="py-2">Status</th><th class="py-2">Booked on</th><th class="py-2"></th>
+                </tr></thead>
+                <tbody>
+                {% for it in items %}
+                <tr class="border-b last:border-none">
+                    <td class="py-3">
+                        {% if it.cls %}{{ it.cls.form_year }} {{ it.cls.subject }}<div class="text-xs text-gray-500">{{ it.cls.day_of_week }}, {{ it.cls.start_time }} – {{ it.cls.end_time }} (Class ID {{ it.cls.id }})</div>
+                        {% else %}{{ it.b.notes or '-' }}{% endif %}
+                    </td>
+                    <td class="py-3">{{ it.when or '-' }}</td>
+                    <td class="py-3">
+                        {% if it.b.status == 'confirmed' %}<span class="px-2 py-0.5 rounded-full text-xs bg-green-100 text-green-800">confirmed</span>
+                        {% else %}<span class="px-2 py-0.5 rounded-full text-xs bg-gray-200 text-gray-600">{{ it.b.status }}</span>{% endif %}
+                    </td>
+                    <td class="py-3 text-gray-500 text-xs">{{ it.b.created_at.strftime('%d %b %Y, %H:%M') if it.b.created_at else '-' }}</td>
+                    <td class="py-3 text-right">
+                        {% if it.b.status == 'confirmed' %}
+                        <button onclick="cancelBooking({{ it.b.id }})" class="text-red-500 hover:text-red-700 text-xs font-medium">Cancel &amp; free seat</button>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p class="text-gray-400 italic text-sm">No bookings yet.</p>
+            {% endif %}
+        </section>
+
+        {% if waitlist %}
+        <section class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6">
+            <h2 class="font-bold mb-4">Waitlist</h2>
+            <ul class="text-sm space-y-1">
+                {% for w in waitlist %}
+                <li>{{ w.student_name or '-' }} · {{ w.subjects or '-' }}{% if w.preferred_day %} · prefers {{ w.preferred_day }}{% endif %}</li>
+                {% endfor %}
+            </ul>
+        </section>
+        {% endif %}
+    </main>
+</div>
+<script>
+async function cancelBooking(id) {
+    if (!confirm('Cancel this booking and free the seat?')) return;
+    const res = await fetch(`/admin/bookings/${id}/cancel`, { method: 'POST' });
+    if (res.ok) location.reload(); else alert('Could not cancel the booking.');
+}
+</script>
+</body>
+</html>

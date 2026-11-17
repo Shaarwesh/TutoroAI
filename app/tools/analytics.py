@@ -31,12 +31,21 @@ async def get_analytics_summary() -> dict:
         result = await db.execute(select(Lead.stage, func.count(Lead.id)).group_by(Lead.stage))
         leads_by_stage = {stage: count for stage, count in result.all()}
 
-        # Total bookings (status = confirmed)
-        result = await db.execute(select(func.count(Booking.id)).where(Booking.status == "confirmed"))
-        total_bookings = result.scalar() or 0
+        # Bookings by status
+        total_bookings = await db.scalar(select(func.count(Booking.id)).where(Booking.status == "confirmed")) or 0
+        cancelled_bookings = await db.scalar(select(func.count(Booking.id)).where(Booking.status == "cancelled")) or 0
 
-        # Conversion rate
-        conversion_rate = round((total_bookings / total_leads * 100), 1) if total_leads > 0 else 0.0
+        # Conversion = UNIQUE leads with at least one confirmed booking / all leads
+        converted_leads = await db.scalar(
+            select(func.count(func.distinct(Booking.lead_id))).where(Booking.status == "confirmed")
+        ) or 0
+        conversion_rate = round((converted_leads / total_leads * 100), 1) if total_leads > 0 else 0.0
+
+        # Seat occupancy across the timetable
+        from app.models.schedule import ClassSchedule
+        seats_total = await db.scalar(select(func.coalesce(func.sum(ClassSchedule.max_capacity), 0))) or 0
+        seats_filled = await db.scalar(select(func.coalesce(func.sum(ClassSchedule.current_enrolled), 0))) or 0
+        occupancy = round(seats_filled / seats_total * 100, 1) if seats_total else 0.0
 
         # Popular subjects — pull all non-null subjects strings and count occurrences
         result = await db.execute(select(Lead.subjects).where(Lead.subjects.isnot(None)))
@@ -66,7 +75,12 @@ async def get_analytics_summary() -> dict:
             "total_leads": total_leads,
             "leads_by_stage": leads_by_stage,
             "total_bookings": total_bookings,
+            "cancelled_bookings": cancelled_bookings,
+            "converted_leads": converted_leads,
             "conversion_rate_percent": conversion_rate,
+            "occupancy_percent": occupancy,
+            "seats_total": int(seats_total),
+            "seats_filled": int(seats_filled),
             "popular_subjects": popular_subjects,
             "recent_leads": recent_leads,
         }

@@ -43,7 +43,7 @@
                         <tbody class="text-gray-700">
                             {% if leads %}
                                 {% for lead in leads %}
-                                <tr class="border-b last:border-none hover:bg-gray-50 transition student-row">
+                                <tr onclick="window.location='/students/{{ lead.id }}'" class="border-b last:border-none hover:bg-gray-50 transition student-row cursor-pointer">
                                     <td class="py-4">
                                         <div class="font-bold text-gray-900 search-target">{{ lead.name or "Unknown" }}</div>
                                         <div class="text-xs text-gray-500 search-target">{{ lead.phone }}</div>

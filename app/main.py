@@ -260,7 +260,7 @@ async def serve_dashboard(
         ) or 0
 
         booking_count = await db.scalar(
-            select(func.count(Booking.id))
+            select(func.count(Booking.id)).where(Booking.status == "confirmed")
         ) or 0
 
     return templates.TemplateResponse(
@@ -292,11 +292,34 @@ async def serve_timetable(
             )
         ).scalars().all()
 
+    day_order = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+
+    def _mins(t):
+        try:
+            hm, ap = t.strip().split()
+            h, mi = map(int, hm.split(":"))
+            return (h % 12 + (12 if ap.upper() == "PM" else 0)) * 60 + mi
+        except Exception:
+            return 0
+
+    by_day = {
+        d: sorted(
+            [c for c in schedules if (c.day_of_week or "").strip().lower() == d.lower()],
+            key=lambda c: _mins(c.start_time),
+        )
+        for d in day_order
+    }
+    seats = sum(c.max_capacity or 0 for c in schedules)
+    filled = sum(c.current_enrolled or 0 for c in schedules)
+
     return templates.TemplateResponse(
         "timetable.html",
         {
             "request": request,
             "schedules": schedules,
+            "by_day": by_day,
+            "seats": seats,
+            "filled": filled,
         },
     )
 
@@ -325,6 +348,66 @@ async def serve_students(
             "leads": leads,
         },
     )
+
+@app.get("/students/{lead_id}", response_class=HTMLResponse)
+async def serve_student_detail(
+    lead_id: int,
+    request: Request,
+    admin: str = Depends(get_current_admin_html),
+):
+    import re
+    from zoneinfo import ZoneInfo
+    from app.models.student import Student
+    from app.models.waitlist import Waitlist
+
+    myt = ZoneInfo("Asia/Kuala_Lumpur")
+    async with AsyncSessionLocal() as db:
+        lead = (await db.execute(select(Lead).where(Lead.id == lead_id))).scalar_one_or_none()
+        if not lead:
+            raise HTTPException(status_code=404, detail="Student not found")
+        bookings = (
+            await db.execute(select(Booking).where(Booking.lead_id == lead_id).order_by(Booking.id.desc()))
+        ).scalars().all()
+        siblings = (await db.execute(select(Student).where(Student.lead_id == lead_id))).scalars().all()
+        waitlist = (await db.execute(select(Waitlist).where(Waitlist.phone == lead.phone))).scalars().all()
+        ids = {int(x.group(1)) for b in bookings if (x := re.search(r"Class ID:\s*(\d+)", b.notes or ""))}
+        classes = {}
+        if ids:
+            rows = (await db.execute(select(ClassSchedule).where(ClassSchedule.id.in_(ids)))).scalars().all()
+            classes = {c.id: c for c in rows}
+
+    items = []
+    for b in bookings:
+        x = re.search(r"Class ID:\s*(\d+)", b.notes or "")
+        when = None
+        if b.appointment_start:
+            start = b.appointment_start if b.appointment_start.tzinfo else b.appointment_start.replace(tzinfo=ZoneInfo("UTC"))
+            when = start.astimezone(myt).strftime("%d %b %Y, %I:%M %p")
+        items.append({"b": b, "cls": classes.get(int(x.group(1))) if x else None, "when": when})
+
+    return templates.TemplateResponse(
+        "student_detail.html",
+        {"request": request, "lead": lead, "items": items, "siblings": siblings, "waitlist": waitlist},
+    )
+
+
+@app.post("/admin/bookings/{booking_id}/cancel")
+async def admin_cancel_booking(
+    booking_id: int,
+    admin: str = Depends(get_current_admin_api),
+):
+    from app.tools.booking_service import cancel_trial_booking
+
+    async with AsyncSessionLocal() as db:
+        booking = (await db.execute(select(Booking).where(Booking.id == booking_id))).scalar_one_or_none()
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    try:
+        await cancel_trial_booking(booking.phone, booking_id)
+    except (ValueError, RuntimeError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return {"status": "Booking cancelled and seat released"}
+
 
 
 @app.get(
