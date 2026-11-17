@@ -50,7 +50,7 @@ CORE OFFERINGS & TEMPLATES:
 - Hours: Monday-Friday 2:00 PM-6:00 PM, Saturday 9:00 AM-1:00 PM, closed Sunday. Each class is 1 hour per subject, max 10 students per class.
 - Free parking outside the centre. The first trial class is FREE with no commitment. Location is Melaka only.
 - If something is NOT stated here or in the knowledge base (public holidays, exact street address, teacher details, other branches), say you do not have that information and offer to have our staff follow up. NEVER invent policies, prices or branches.
-- You CANNOT cancel bookings or manage waitlists. For those requests, call request_human_handoff and tell the customer our staff will assist. Never claim a cancellation or waitlist spot was made.
+- Cancelling: call check_my_booking to find the booking ID, confirm with the customer, then call cancel_my_booking.\n- Siblings: if the parent wants to register another child, call add_sibling once per child and mention the 10% sibling discount.\n- Waitlist: if check_available_classes shows no open class for what the customer wants, offer the waitlist and call join_waitlist.\n- Only tell the customer something was cancelled, added or waitlisted AFTER the tool returns success.
 
 HANDLING PACKED INFORMATION (SINGLE-TURN EXTRACTION):
 If a new customer sends a single message containing multiple registration details (e.g., Parent Name, Student Name, Form/Year, Email, Address, Subjects), extract ALL available fields instantly and call `save_lead` immediately with those parameters. 
@@ -59,10 +59,10 @@ Do not ask step-by-step questions for information the user has already provided.
 STEP-BY-STEP DATA COLLECTION FLOW (If details are missing, collect incrementally):
 1. Greet the user and check history using `get_lead_info`.
 2. Address any initial FAQ questions via `query_knowledge_base`.
-3. Collect Parent Name (Save).
-4. Collect Student Name (Save).
-5. Collect Student Form/Year (Save).
-6. Collect Email & Address (Save).
+3. Ask for their name in a friendly way (e.g. "Could I get your name?") and save it.
+4. Ask whether they are a parent registering a child, or a student registering for themselves (e.g. "Are you a parent registering your child, or a student registering yourself?"). If a parent, ask for the child's name next. If a student, their own name is also the student name.
+5. Ask which form/year the student is in. When saving, pass child_age as the number only (Form 3 -> 3, Standard 5 -> 5).
+6. Ask for an email address and a home address (the home address may be skipped).
 7. Display the structured Subject Menu & Package Pricing clearly.
 8. Once subjects are chosen, present a full *Registration Summary* showing:
    *Registration Summary*
@@ -71,6 +71,13 @@ STEP-BY-STEP DATA COLLECTION FLOW (If details are missing, collect incrementally
    Subjects: [subj] | Fee: RM[calculated amt]
    Ask them to reply 'CONFIRM' or 'CANCEL'.
 9. Upon 'CONFIRM', transition to checking available slots using `check_available_classes` and booking via `book_trial` using the provided Class ID.
+
+HUMAN TONE (CRITICAL):
+- Talk like a warm, friendly receptionist, not a form. Short natural sentences, ONE question at a time.
+- Never write robotic requests like "please provide parent name" or "student name". Say things like "Could I get your name?" or "And what's your child's name?".
+- In Malay, say it naturally too: "Boleh saya tahu nama anda?" / "Anda ibu bapa yang mendaftar untuk anak, atau pelajar yang mendaftar sendiri?"
+- Never ask for something the customer already told you, or that get_lead_info or the chat history already shows. If they give several details in one message, accept all of them.
+- Do not repeat what they just said back at length, and never add filler like "whenever you're ready".
 
 LANGUAGE RULE:
 You MUST reply in the exact same language the user uses.
@@ -85,7 +92,7 @@ Never send long paragraphs. You must use WhatsApp's native formatting to make yo
 - Use spacing (newlines) to separate different thoughts.
 
 OUTPUT CONSTRAINT:
-Every time you execute a tool call, you MUST append a friendly, clear, non-empty text response back to the user explaining what was done or what step is next. Never leave an output message blank.
+Your final reply to the customer must always be non-empty, friendly and clear. Send exactly ONE message per turn: never repeat yourself.
 
 HUMAN HANDOFF PROTOCOL:
 If a parent expresses deep concerns, anxiety, anger, or says things like "My son is failing" or "I am worried," DO NOT try to handle the emotional concern. Immediately call 'request_human_handoff'. Explain politely that you are transferring them to a senior teacher/admin who will assist them shortly.
@@ -289,7 +296,7 @@ def request_human_handoff(phone: str, reason: str) -> str:
     """Triggers when a parent has a complex, emotional, or highly specific concern."""
     try:
         from app.db.redis_client import pause_bot
-        _db_run(pause_bot(phone))
+        _db_run(pause_bot(_real_phone(phone)))
         logger.warning(f"🚨 HUMAN HANDOFF REQUESTED for {phone}. Reason: {reason}")
         return "Please inform the user that their concern is very important, and you are transferring them to a human coordinator who will reply to this chat shortly."
     except Exception as e:
@@ -318,6 +325,106 @@ def reschedule_booking(phone: str, booking_id: int, new_class_id: int, parent_na
         logger.error(f"reschedule_booking error: {e}")
         return f"Rescheduling failed: {e}"
 
+
+# ── Extra tools: cancel, siblings, waitlist ───────────────────────────────────
+
+async def _add_sibling_async(phone, student_name, form_year, subjects):
+    from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+    from sqlalchemy import select
+    from app.models.lead import Lead
+    from app.db.crud_student import add_student
+
+    engine = create_async_engine(settings.database_url, echo=False)
+    Session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    try:
+        async with Session() as db:
+            lead = (await db.execute(select(Lead).where(Lead.phone == phone))).scalar_one_or_none()
+            if not lead:
+                return None
+            return await add_student(db, lead.id, student_name, form_year, subjects)
+    finally:
+        await engine.dispose()
+
+async def _join_waitlist_async(phone, parent_name, student_name, subjects, preferred_day):
+    from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+    from app.models.waitlist import Waitlist
+
+    engine = create_async_engine(settings.database_url, echo=False)
+    Session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    try:
+        async with Session() as db:
+            db.add(Waitlist(phone=phone, parent_name=parent_name, student_name=student_name,
+                            subjects=subjects, preferred_day=preferred_day))
+            await db.commit()
+    finally:
+        await engine.dispose()
+
+@tool
+def cancel_my_booking(phone: str, booking_id: int) -> str:
+    """Cancel one of the customer's confirmed bookings. Use check_my_booking first to get the booking ID, and confirm with the customer before calling this."""
+    try:
+        bookings = _db_run(_get_bookings_async(phone))
+        target = next((b for b in bookings if b.id == booking_id and b.status == "confirmed"), None)
+        if not target:
+            return "No active booking with that ID was found for this number."
+        _db_run(_cancel_booking_async(booking_id))
+        return f"Booking {booking_id} has been cancelled. Tell the customer it is cancelled and offer to book another time."
+    except Exception as e:
+        logger.error(f"cancel_my_booking error: {e}")
+        return f"Cancellation failed: {e}"
+
+@tool
+def add_sibling(phone: str, student_name: str, form_year: Optional[str] = None, subjects: Optional[str] = None) -> str:
+    """Register an additional child (sibling) under the same parent. Call once per extra child."""
+    try:
+        student = _db_run(_add_sibling_async(phone, student_name, form_year, subjects))
+        if not student:
+            return "No parent registration found for this number yet. Register the parent and first child first."
+        return f"Sibling {student_name} registered. Mention that siblings get a 10% discount."
+    except Exception as e:
+        logger.error(f"add_sibling error: {e}")
+        return f"Could not register sibling: {e}"
+
+@tool
+def join_waitlist(phone: str, parent_name: str, student_name: str, subjects: Optional[str] = None, preferred_day: Optional[str] = None) -> str:
+    """Add the customer to the waitlist when no suitable class has an open seat."""
+    try:
+        _db_run(_join_waitlist_async(phone, parent_name, student_name, subjects, preferred_day))
+        return "Added to the waitlist. Tell the customer our staff will contact them when a seat opens."
+    except Exception as e:
+        logger.error(f"join_waitlist error: {e}")
+        return f"Could not join waitlist: {e}"
+
+
+
+# ── Always use the REAL WhatsApp ID (the model sometimes changes or drops the prefix) ─────────
+import contextvars
+_CURRENT_PHONE = contextvars.ContextVar("current_phone", default=None)
+
+def _real_phone(arg=None):
+    cur = _CURRENT_PHONE.get()
+    if cur:
+        return cur
+    p = (arg or "").strip()
+    if p and not p.startswith("whatsapp:"):
+        p = "whatsapp:" + (p if p.startswith("+") else "+" + p.lstrip("+"))
+    return p
+
+def _with_real_phone(fn):
+    def inner(phone, *a, **kw):
+        return fn(_real_phone(phone), *a, **kw)   # resolved in the tool's thread, then returns the coroutine
+    return inner
+
+for _n in ("_get_lead", "_save_lead_async", "_save_booking_async", "_get_bookings_async",
+           "_add_sibling_async", "_join_waitlist_async"):
+    if _n in globals():
+        globals()[_n] = _with_real_phone(globals()[_n])
+
+def _invoke_with_phone(agent, phone, payload):
+    _CURRENT_PHONE.set(phone)
+    return agent.invoke(payload)
+
+
 # ── Agent ─────────────────────────────────────────────────────────────────────
 
 def _build_agent() -> AgentExecutor:
@@ -329,7 +436,8 @@ def _build_agent() -> AgentExecutor:
     )
     tools = [
         query_knowledge_base, get_lead_info, save_lead, check_available_classes, book_trial,
-        check_my_booking, request_human_handoff, reschedule_booking
+        check_my_booking, request_human_handoff, reschedule_booking,
+        cancel_my_booking, add_sibling, join_waitlist
     ]
     prompt = ChatPromptTemplate.from_messages([
         ("system", SYSTEM_PROMPT),
@@ -360,7 +468,7 @@ async def run_agent(user_phone: str, user_message: str, history: list[dict]) -> 
     try:
         result = await asyncio.get_event_loop().run_in_executor(
             None,
-            lambda: agent.invoke({
+            lambda: _invoke_with_phone(agent, user_phone, {
                 "input": user_message,
                 "chat_history": chat_history,
                 "phone": user_phone,

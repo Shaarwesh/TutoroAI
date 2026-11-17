@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analytics | TUTORO AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 text-gray-800">
+<div class="flex h-screen">
+    <aside class="w-64 bg-slate-900 text-white flex flex-col">
+        <div class="p-6 text-2xl font-bold tracking-wider">SWESH</div>
+        <nav class="flex-1 px-4 space-y-2">
+            <a href="/dashboard" class="block px-4 py-2 hover:bg-slate-800 rounded-lg">📊 Dashboard</a>
+            <a href="/timetable" class="block px-4 py-2 hover:bg-slate-800 rounded-lg">📅 Timetable</a>
+            <a href="/students" class="block px-4 py-2 hover:bg-slate-800 rounded-lg">👥 Students</a>
+            <a href="/analytics" class="block px-4 py-2 bg-slate-800 rounded-lg">📈 Analytics</a>
+        </nav>
+    </aside>
+    <main class="flex-1 p-8 overflow-y-auto">
+        <h1 class="text-3xl font-bold mb-6">Weekly Report Card</h1>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+            <div class="bg-white rounded-xl shadow p-5">
+                <div class="text-sm text-gray-500">Leads captured</div>
+                <div class="text-4xl font-bold">{{ d.total_leads }}</div>
+            </div>
+            <div class="bg-white rounded-xl shadow p-5">
+                <div class="text-sm text-gray-500">Trial bookings</div>
+                <div class="text-4xl font-bold">{{ d.total_bookings }}</div>
+            </div>
+            <div class="bg-white rounded-xl shadow p-5">
+                <div class="text-sm text-gray-500">Lead → booking conversion</div>
+                <div class="text-4xl font-bold">{{ d.conversion_rate_percent }}%</div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <section class="bg-white rounded-xl shadow p-5">
+                <h2 class="font-bold mb-4">Most requested subjects</h2>
+                {% if d.popular_subjects %}
+                    {% set mx = d.popular_subjects[0].count %}
+                    {% for s in d.popular_subjects %}
+                    <div class="mb-3">
+                        <div class="flex justify-between text-sm mb-1"><span>{{ s.subject }}</span><span class="text-gray-500">{{ s.count }}</span></div>
+                        <div class="h-3 bg-gray-100 rounded-full overflow-hidden">
+                            <div class="h-3 bg-blue-500 rounded-full" style="width: {{ (s.count / mx * 100)|round|int }}%"></div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="text-gray-400 italic">No subject data yet.</p>
+                {% endif %}
+            </section>
+
+            <section class="bg-white rounded-xl shadow p-5">
+                <h2 class="font-bold mb-4">Pipeline</h2>
+                {% if d.leads_by_stage %}
+                    <div class="flex flex-wrap gap-2 mb-6">
+                    {% for stage, n in d.leads_by_stage.items() %}
+                        <span class="px-3 py-1 rounded-full text-sm bg-slate-100">{{ stage }}: <b>{{ n }}</b></span>
+                    {% endfor %}
+                    </div>
+                {% endif %}
+                <h2 class="font-bold mb-3">Recent enquiries</h2>
+                {% if d.recent_leads %}
+                    <table class="w-full text-sm">
+                    {% for l in d.recent_leads %}
+                        <tr class="border-b last:border-none">
+                            <td class="py-2 font-medium">{{ l.name }}</td>
+                            <td class="py-2"><span class="px-2 py-0.5 rounded-full text-xs bg-green-100 text-green-800">{{ l.stage }}</span></td>
+                            <td class="py-2 text-gray-400 text-xs">{{ l.created_at[:16] }}</td>
+                        </tr>
+                    {% endfor %}
+                    </table>
+                {% else %}
+                    <p class="text-gray-400 italic">No enquiries yet.</p>
+                {% endif %}
+            </section>
+        </div>
+    </main>
+</div>
+</body>
+</html>

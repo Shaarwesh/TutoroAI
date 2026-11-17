@@ -14,7 +14,7 @@ from app.models.schedule import ClassSchedule
 from app.models.lead import Lead
 from app.models.booking import Booking
 from app.models.admin import AdminUser
-from app.routers import webhook
+from app.routers import webhook, demo
 from app.config import settings
 from app.tools.security import verify_password, get_password_hash
 from app.tools.email_auth import send_reset_link_email
@@ -27,7 +27,7 @@ async def get_current_admin_html(request: Request):
     if session_id and _redis_async:
         username = await _redis_async.get(f"session:{session_id}")
         if username:
-            return username.decode("utf-8")
+            return username
     
     raise HTTPException(status_code=303, headers={"Location": "/login"})
 
@@ -37,7 +37,7 @@ async def get_current_admin_api(request: Request):
     if session_id and _redis_async:
         username = await _redis_async.get(f"session:{session_id}")
         if username:
-            return username.decode("utf-8")
+            return username
             
     raise HTTPException(status_code=401, detail="Unauthorized")
 
@@ -74,6 +74,9 @@ app.add_middleware(
     CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"],
 )
 app.include_router(webhook.router, prefix="/webhook", tags=["Webhook"])
+
+if os.getenv("DEMO_MODE") == "1":
+    app.include_router(demo.router)
 
 # --- AUTHENTICATION ROUTES (LOGIN / LOGOUT) ---
 @app.get("/login", response_class=HTMLResponse)
@@ -132,6 +135,12 @@ async def serve_students(request: Request, admin: str = Depends(get_current_admi
     async with AsyncSessionLocal() as db:
         leads = (await db.execute(select(Lead).order_by(Lead.id.desc()))).scalars().all()
     return templates.TemplateResponse("students.html", {"request": request, "leads": leads})
+
+@app.get("/analytics", response_class=HTMLResponse)
+async def serve_analytics(request: Request, admin: str = Depends(get_current_admin_html)):
+    from app.tools.analytics import get_analytics_summary
+    data = await get_analytics_summary()
+    return templates.TemplateResponse("analytics.html", {"request": request, "d": data})
 
 # --- PASSWORD RESET ROUTES ---
 @app.get("/forgot-password", response_class=HTMLResponse)
