@@ -1,279 +1,366 @@
-# TUTORO AI 🤖
+# 🤖 TUTORO AI
+### Agentic WhatsApp Sales & Booking Assistant for Tuition Centres
 
-### WhatsApp Sales & Booking Agent for Tuition Centres
+**From customer enquiries to trial-class reservations — powered by conversational AI, RAG, and real-world integrations.**
 
-**TUTORO AI** is an autonomous AI agent that operates on WhatsApp to handle the full customer journey for a tuition centre — from the first enquiry to a confirmed trial class booking — without any human involvement.
+[![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![LangChain](https://img.shields.io/badge/LangChain-Agent_Framework-blue)](https://langchain.com)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Database-4169E1?logo=postgresql&logoColor=white)](https://postgresql.org)
+[![Redis](https://img.shields.io/badge/Redis-Conversation_State-DC382D?logo=redis&logoColor=white)](https://redis.io)
+![Status](https://img.shields.io/badge/Status-Active_Development-yellow)
 
-Rather than a simple FAQ chatbot, TUTORO AI combines **lead qualification, bilingual conversation, RAG-grounded question answering, Google Calendar booking, and a real-time admin dashboard** to replace the manual WhatsApp management that small tuition businesses currently do by hand.
-
-The agent is deployed on **WhatsApp via Twilio**, powered by **Groq (Llama 3.3 70B)** with a **LangChain agent framework**, and runs on **FastAPI** with **PostgreSQL, Redis, and Google Calendar** integrations.
-
----
-
-## 🎥 Demo
-
-> TUTORO AI completing a full registration and trial class booking autonomously via WhatsApp — from "Hi" to a confirmed Google Calendar event, entirely without human intervention.
-
-**Proven end-to-end:** The agent collected a parent's name, child's details, form/year, contact info, email, home address, and subject preferences — calculated the correct monthly fee — then booked a real trial class directly into Google Calendar.
+**[GitHub Repository](https://github.com/Shaarwesh/TutoroAI)**
 
 ---
 
-## 🎯 Project Background
+## 📖 Overview
 
-Small tuition centres in Malaysia receive constant WhatsApp enquiries about subjects, fees, class schedules, and trial bookings. Staff manually reply to every message, ask the same qualifying questions repeatedly, and manually schedule appointments — a time-consuming process prone to missed leads and delayed responses.
+**TUTORO AI** is an AI-powered WhatsApp assistant developed to automate customer enquiries, student registration, and trial-class booking for tuition centres.
 
-TUTORO AI solves this by deploying an AI agent that handles the entire inbound sales flow autonomously, 24/7, in both English and Bahasa Malaysia — responding in the same language the customer uses.
+Designed around the communication habits of Malaysian small businesses, TUTORO AI enables parents to interact with a tuition centre through natural WhatsApp conversations in **English or Bahasa Malaysia**.
 
-The project demonstrates the practical application of agentic AI in a real business context, combining multiple production-grade integrations into a single, deployable system.
+Unlike a conventional rule-based chatbot, TUTORO AI uses a **LangChain tool-calling agent**, a **Retrieval-Augmented Generation (RAG) knowledge base**, and integrations with PostgreSQL and Google Calendar to perform actions beyond simply answering questions.
+
+The system can retrieve tuition information, collect parent and student details, identify returning customers, check available classes, register siblings, manage waitlist requests, and create or cancel trial bookings.
+
+A companion web-based administrative interface provides class management, student enquiry records, and basic analytics. This interface is currently being expanded.
+
+**Project Type:** Personal AI Software Development Project  
+**Application:** WhatsApp Automation and Tuition Centre Management  
+**Primary Language:** Python 3.11  
+**Deployment Configuration:** Railway  
+**Development Status:** Core AI agent implemented; admin dashboard under development
 
 ---
+
+## 🎯 Problem Statement
+
+Small tuition centres often depend on staff to handle repetitive WhatsApp enquiries about class schedules, fees, subjects, and student registration.
+
+This creates several operational challenges:
+
+- Repeatedly answering identical customer questions.
+- Manually collecting parent and student information.
+- Tracking enquiries across different WhatsApp conversations.
+- Checking class availability and coordinating trial appointments.
+- Maintaining accurate booking and student records.
+- Responding to customers outside normal business hours.
+
+TUTORO AI explores how autonomous, tool-enabled AI agents can reduce this repetitive workload while preserving a conversational customer experience.
 
 ## 🎯 Project Objectives
 
-1. **To design and build** an autonomous AI sales agent capable of qualifying leads, answering grounded questions, and booking appointments via WhatsApp.
-2. **To demonstrate** bilingual conversational AI (English + Bahasa Malaysia) in a real Malaysian business context.
-3. **To integrate** multiple production APIs (Twilio, Groq, Google Calendar, PostgreSQL, Redis) into a cohesive, deployable agentic system.
-4. **To evaluate** the system's reliability and correctness through end-to-end testing with real calendar bookings and database persistence.
+1. Design an AI-powered WhatsApp assistant capable of conducting natural-language conversations and executing business actions through tools.
+2. Implement RAG to answer tuition-related questions using a structured knowledge base.
+3. Build a registration and trial-booking workflow supported by PostgreSQL and Google Calendar.
+4. Support English and Bahasa Malaysia conversations for Malaysian users.
+5. Develop an administrative interface for class scheduling, student records, and operational reporting.
+6. Evaluate agent behaviour, retrieval quality, and integration reliability through development testing.
 
 ---
 
-## ✨ Key Features
+## ✨ Core Features
 
-### 🗣️ Bilingual Conversation (English + Bahasa Malaysia)
+### 🗣️ 1. Conversational WhatsApp AI
 
-TUTORO AI detects the language of each incoming message and responds entirely in the same language — English replies for English messages, full Bahasa Malaysia for Malay messages, with natural Manglish handling for mixed inputs.
+TUTORO AI receives incoming WhatsApp messages through Twilio and processes them using a LangChain agent.
 
----
+The agent can interpret natural-language enquiries, determine which tools are relevant, and generate responses based on the information returned.
 
-### 🧠 RAG-Grounded Knowledge Base
+The system includes:
 
-Rather than relying on the LLM's general knowledge, TUTORO AI queries a **FAISS vector index** built from the tuition centre's own FAQ documents. This means:
+- English and Bahasa Malaysia conversational support.
+- Context-aware multi-turn conversations.
+- Conversation history stored in Redis.
+- Recognition of existing customer records.
+- Conversation reset commands.
+- Basic rate limiting and webhook validation.
 
-* Fees and packages are always accurate (pulled from actual documents, not hallucinated)
-* Subjects offered are never fabricated — if asked about Science (not offered), the bot correctly says so
-* Schedule, teacher info, policies, and testimonials are all retrieved from real source documents
+The current agent is powered by **Groq's `openai/gpt-oss-120b` model**.
 
----
+### 🧠 2. Retrieval-Augmented Generation (RAG)
 
-### 📋 Full Registration Flow
+TUTORO AI uses RAG to retrieve relevant tuition-centre information from local FAQ documents.
 
-TUTORO AI guides customers through a structured registration process, collecting:
+The knowledge base includes English and Bahasa Malaysia documents containing tuition-related information.
 
-* Parent/guardian name
-* Student name
-* Form/year level
-* Contact phone number
-* Email address
-* Home address
-* Subject selection (with package pricing options shown as a numbered menu)
+**RAG pipeline:**
 
-Each piece of information is saved to the database incrementally — even if the conversation is abandoned mid-flow, the data is preserved.
+1. Load tuition-centre FAQ documents.
+2. Split documents into smaller text chunks.
+3. Generate vector embeddings using FastEmbed.
+4. Store embeddings in a FAISS vector index.
+5. Retrieve relevant passages for incoming questions.
+6. Provide retrieved context to the language-model agent.
 
----
+**Current embedding model:** `BAAI/bge-small-en-v1.5`
 
-### 📅 Real Google Calendar Booking
+**Vector database:** FAISS
 
-When a customer confirms their registration, TUTORO AI:
+This architecture helps ground the AI's answers in configured information rather than relying exclusively on general model knowledge.
 
-1. Queries the connected Google Calendar for genuinely available trial slots
-2. Presents real slots to the customer (never fabricated times)
-3. Creates an actual calendar event with parent name, student name, subjects, and contact info
-4. Sends an admin notification to the business owner's WhatsApp
+### 👨‍👩‍👧 3. Lead and Student Registration
 
----
+The agent can collect and save customer information during conversations.
 
-### 🔄 Cancel & Reschedule
+Supported registration details include parent or guardian information, student names, educational levels, selected subjects, and contact information.
 
-Customers can text "cancel my booking" or "I want to reschedule" at any time. TUTORO AI:
+Lead records are stored in PostgreSQL, allowing the system to retrieve information when a customer returns.
 
-1. Looks up their existing booking by phone number
-2. Cancels the Google Calendar event
-3. Updates the database record
-4. Notifies the admin
-5. Offers new available slots for rescheduling
+### 📅 4. Trial-Class Booking
 
----
+The booking workflow integrates the centre's class timetable with Google Calendar.
 
-### 👨‍👩‍👧‍👦 Multi-Student Registration (Siblings)
+The application:
 
-A parent registering more than one child is handled natively — the first child goes through the standard flow, and TUTORO AI prompts for additional children and registers each with their own subjects and form level under the same parent record.
+1. Retrieves available classes from PostgreSQL.
+2. Checks a selected class's maximum capacity.
+3. Verifies the parent's registration record.
+4. Calculates the next occurrence of the selected class.
+5. Checks Google Calendar availability.
+6. Creates the Google Calendar event.
+7. Saves the confirmed booking to PostgreSQL.
+8. Updates the class's stored enrolled count.
 
----
+The booking service uses the **Asia/Kuala_Lumpur** timezone and includes error handling for unsuccessful booking attempts.
 
-### ⏳ Waitlist Handling
+### ❌ 5. Booking Cancellation
 
-When no trial slots are available in the next 7 days, TUTORO AI offers to add the customer to a waitlist rather than simply turning them away, capturing leads that would otherwise be lost.
+Customers can request cancellation of an existing booking.
 
----
+The implemented cancellation service:
 
-### 🔔 Admin Notifications
+- Finds the customer's confirmed booking.
+- Attempts to remove the associated Google Calendar event.
+- Updates the booking status to `cancelled` when cancellation succeeds.
 
-Every new booking and every cancellation triggers an instant WhatsApp message to the configured admin number, including full customer details and the booked slot. Business owners are always informed in real time without checking any dashboard.
+**Current limitation:** The cancellation workflow does not yet decrement the class's enrolled count. This remains an important synchronization improvement.
 
----
+### 👨‍👩‍👧‍👦 6. Sibling Registration
 
-### ⏰ Automated Reminders
+The agent supports registration of additional students under an existing parent's record.
 
-A built-in reminder system checks for upcoming trial classes and sends WhatsApp reminders to customers approximately 24 hours before their appointment. Triggered via a protected API endpoint suitable for scheduled jobs.
+Each sibling can have separate details such as name, educational level, and selected subjects.
 
----
+### ⏳ 7. Waitlist Management
 
-### 📊 Analytics Dashboard
+When a suitable class is unavailable, the agent can collect a waitlist request.
 
-A live analytics dashboard accessible via browser shows:
+The waitlist stores customer and student details, subject preferences, and preferred days where provided.
 
-* Total leads captured
-* Trial bookings confirmed
-* Conversion rate (lead → booking percentage)
-* Most requested subjects (ranked bar chart)
-* Recent enquiries with stage badges
+Automated notification when a seat becomes available is a future enhancement.
 
-Styled as a "Weekly Report Card" theme appropriate for an education business context.
+### 🙋 8. Human Handoff
 
----
+The application includes an agent tool for requesting human assistance and Redis-based functionality for pausing bot responses.
 
-### 🔁 Returning Customer Recognition
+The overall staff takeover and notification workflow requires further refinement.
 
-TUTORO AI identifies returning customers by phone number at the start of every conversation. Returning customers are greeted by name and offered to update their information or book a new trial class — without being asked to re-enter details already on file.
+### 📊 9. Administrative Dashboard
+
+TUTORO AI includes an authenticated browser-based administrative interface.
+
+Its current pages cover:
+
+| Module | Current Functionality |
+|---|---|
+| Dashboard | Lead totals, class totals, booking counts, class schedule listing |
+| Class Management | Add, edit, and delete class schedules |
+| Students | Searchable list of parent and student enquiry records |
+| Timetable | Dedicated page with basic class-count information |
+| Analytics | Lead, booking, conversion, and popular-subject reporting |
+| Authentication | Admin login, logout, sessions, and password recovery functionality |
+
+**Development status:** The dashboard is functional in parts but is not yet a complete tuition management system.
+
+Detailed clickable student profiles, a comprehensive weekly timetable, and fully synchronized class-capacity reporting remain in progress.
+
+### 🔔 10. Reminder Generation
+
+The project includes a module that identifies upcoming confirmed bookings and generates reminder records approximately 24 hours before their appointments.
+
+The current implementation saves reminder information locally in JSON files.
+
+**WhatsApp reminder delivery is not yet implemented in this module.**
 
 ---
 
 ## 🏗️ System Architecture
 
-```
-Customer's WhatsApp message
-        │
-        ▼
-Twilio Webhook → FastAPI (/webhook/whatsapp)
-        │
-        ▼
-Load conversation history from Redis (24hr TTL, per phone number)
-        │
-        ▼
-LangChain Agent (Groq — Llama 3.3 70B) decides which tool(s) to call:
-    ├── get_lead_info          → check if returning customer (PostgreSQL)
-    ├── query_knowledge_base   → RAG lookup for fees/subjects/schedule (FAISS)
-    ├── save_lead              → save/update registration details (PostgreSQL)
-    ├── check_availability     → fetch real open slots (Google Calendar API)
-    ├── book_trial              → create Calendar event + save booking (PostgreSQL)
-    ├── cancel_my_booking      → cancel Calendar event + update record
-    ├── add_sibling            → register additional child under same parent
-    ├── join_waitlist          → add to waitlist when no slots available
-    └── check_my_booking       → look up existing booking details
-        │
-        ▼
-Agent's text reply → saved to Redis → sent back via Twilio → customer sees it on WhatsApp
-        │
-        ▼
-Admin notification → business owner's WhatsApp (on booking/cancellation)
-
+```mermaid
+flowchart TD
+    A["Parent / Guardian"] --> B["WhatsApp / Twilio"]
+    B --> C["FastAPI Webhook"]
+    C <--> D[("Redis Conversation History")]
+    C --> E["LangChain AI Agent"]
+    E --> F["Groq LLM"]
+    E --> G["RAG Retrieval"]
+    G --> H[("FAISS Knowledge Base")]
+    E --> I["Registration & Booking Tools"]
+    I <--> J[("PostgreSQL")]
+    I <--> K["Google Calendar API"]
+    E --> L["AI Response"]
+    L --> B
+    M["Admin Dashboard"] <--> J
 ```
 
----
+### Agent Tools
 
-## 🗄️ Database Schema
+The agent uses tools defined in `app/agents/sales_agent.py`.
 
-```
-PostgreSQL
-│
-├── leads
-│   ├── id, phone (unique), name (parent)
-│   ├── email, address, language
-│   ├── child_name, child_age (primary child)
-│   ├── subjects, notes
-│   └── stage (new → qualified → confirmed → booked → cancelled)
-│
-├── bookings
-│   ├── id, lead_id (FK), phone
-│   ├── appointment_start, appointment_end
-│   ├── subjects, google_event_id
-│   └── status (confirmed / cancelled)
-│
-├── students
-│   ├── id, lead_id (FK)
-│   ├── name, form_year, subjects
-│   └── created_at
-│
-└── waitlist
-    ├── id, phone, parent_name, student_name
-    ├── subjects, preferred_day
-    └── notified (boolean)
+| Tool | Function |
+|---|---|
+| `query_knowledge_base` | Retrieve relevant FAQ information |
+| `get_lead_info` | Retrieve existing customer records |
+| `save_lead` | Create or update customer registration |
+| `check_available_classes` | Retrieve available classes from PostgreSQL |
+| `book_trial` | Create a trial-class booking |
+| `check_my_booking` | Look up existing confirmed bookings |
+| `cancel_my_booking` | Cancel an existing booking |
+| `add_sibling` | Register another student |
+| `join_waitlist` | Save a waitlist request |
+| `request_human_handoff` | Request staff intervention |
+| `reschedule_booking` | Acknowledge rescheduling requests and direct customers to staff |
 
-Redis
-└── convo:{phone_number}   → conversation history list (JSON messages, 24hr TTL)
-
-```
+The rescheduling tool currently preserves the existing booking and requires administrator assistance to complete the change.
 
 ---
 
 ## 🛠️ Technology Stack
 
 | Technology | Purpose |
-| --- | --- |
-| **FastAPI + Uvicorn** | Async API server, Twilio webhook receiver |
-| **LangChain** | Agent framework, tool orchestration |
-| **Groq API (Llama 3.3 70B)** | LLM backbone for agent reasoning and tool-calling |
-| **FAISS** | Local vector store for RAG knowledge base |
-| **Sentence Transformers** | Multilingual embeddings (paraphrase-multilingual-MiniLM-L12-v2) |
-| **Twilio WhatsApp API** | Inbound/outbound WhatsApp messaging |
-| **Google Calendar API** | Real availability checking and event creation |
-| **PostgreSQL + SQLAlchemy** | Async relational database for leads and bookings |
-| **Redis (Upstash)** | Conversation state management |
-| **Railway** | Cloud deployment platform |
-| **Pydantic + pydantic-settings** | Configuration and validation |
-| **Python 3.11** | Primary programming language |
-| **Git + GitHub** | Version control |
+|---|---|
+| Python 3.11 | Core programming language |
+| FastAPI | API server and webhook processing |
+| Uvicorn | ASGI application server |
+| LangChain | AI agent and tool orchestration |
+| Groq | Language-model inference |
+| `openai/gpt-oss-120b` | Currently configured LLM |
+| FAISS | Vector-based document retrieval |
+| FastEmbed | Text embedding generation |
+| Twilio WhatsApp API | WhatsApp communication |
+| Google Calendar API | Calendar availability and event management |
+| PostgreSQL | Persistent business records |
+| SQLAlchemy / asyncpg | Asynchronous database operations |
+| Redis | Conversation and session management |
+| Jinja2 | Server-rendered admin pages |
+| Tailwind CSS | Admin interface styling |
+| Pydantic Settings | Environment configuration |
+| Railway | Deployment configuration |
+| Sentry SDK | Optional error monitoring |
+
+---
+
+## 🗄️ Database Design
+
+TUTORO AI uses PostgreSQL for persistent application data.
+
+The main database models are:
+
+**Leads**
+
+Stores parent or guardian information, contact details, student enquiry information, subjects, and registration stages.
+
+**Students**
+
+Stores additional student records associated with parent leads.
+
+**Bookings**
+
+Stores confirmed or cancelled trial bookings, including appointment dates, selected subjects, and Google Calendar event identifiers.
+
+**Class Schedules**
+
+Stores subject, educational level, day of week, start and end time, maximum capacity, and current enrolled count.
+
+**Waitlist**
+
+Stores customer requests for classes that are currently unavailable.
+
+**Admin Users**
+
+Stores authentication information for the administrative interface.
+
+Redis is used separately for conversation state, administrator sessions, and other temporary application data.
 
 ---
 
 ## 📂 Project Structure
 
-```
-tutoro-ai/
+```text
+TutoroAI/
+│
 ├── app/
-│   ├── main.py                     # FastAPI entry point, admin endpoints
-│   ├── config.py                   # Settings (reads from .env)
-│   ├── routers/
-│   │   └── webhook.py              # Twilio WhatsApp webhook handler
+│   ├── main.py
+│   ├── config.py
+│   │
 │   ├── agents/
-│   │   └── sales_agent.py          # LangChain agent + all tools
-│   ├── tools/
-│   │   ├── knowledge_base.py      # FAISS RAG setup and query
-│   │   ├── calendar_tool.py        # Google Calendar integration
-│   │   ├── notifications.py        # Admin WhatsApp alerts
-│   │   ├── reminders.py            # 24hr reminder system
-│   │   └── analytics.py            # Lead/booking metrics
-│   ├── models/
-│   │   ├── lead.py                 # Lead SQLAlchemy model
-│   │   ├── booking.py              # Booking SQLAlchemy model
-│   │   ├── student.py              # Student (sibling) model
-│   │   └── waitlist.py             # Waitlist model
+│   │   └── sales_agent.py
+│   │
+│   ├── routers/
+│   │   ├── webhook.py
+│   │   └── demo.py
+│   │
 │   ├── db/
-│   │   ├── postgres.py             # Async DB engine + table creation
-│   │   ├── redis_client.py         # Conversation state
-│   │   ├── crud_lead.py            # Lead CRUD operations
-│   │   ├── crud_booking.py         # Booking CRUD operations
-│   │   └── crud_student.py         # Student CRUD operations
-│   └── static/
-│       └── dashboard.html          # Visual analytics dashboard
+│   │   ├── postgres.py
+│   │   ├── redis_client.py
+│   │   ├── crud_lead.py
+│   │   ├── crud_booking.py
+│   │   └── crud_student.py
+│   │
+│   ├── models/
+│   │   ├── lead.py
+│   │   ├── student.py
+│   │   ├── booking.py
+│   │   ├── schedule.py
+│   │   ├── waitlist.py
+│   │   └── admin.py
+│   │
+│   ├── tools/
+│   │   ├── knowledge_base.py
+│   │   ├── schedule_tool.py
+│   │   ├── booking_service.py
+│   │   ├── calendar_tool.py
+│   │   ├── analytics.py
+│   │   ├── notifications.py
+│   │   ├── reminders.py
+│   │   ├── handoff.py
+│   │   ├── security.py
+│   │   └── email_auth.py
+│   │
+│   └── templates/
+│       ├── login.html
+│       ├── dashboard.html
+│       ├── students.html
+│       ├── timetable.html
+│       ├── analytics.html
+│       ├── forgot_password.html
+│       └── reset_password.html
+│
 ├── knowledge_base/
 │   ├── docs/
-│   │   ├── faq_english.md          # Tuition centre FAQ (English)
-│   │   └── faq_malay.md            # Tuition centre FAQ (Bahasa Malaysia)
-│   └── index/                      # Pre-built FAISS vector index
+│   │   ├── faq_english.md
+│   │   └── faq_malay.md
+│   └── index/
+│
 ├── tests/
-│   ├── test_phase3_db.py           # PostgreSQL CRUD tests
-│   ├── test_phase5_agent.py        # Full end-to-end agent test
-│   ├── test_phase5_smoke.py        # Quick agent smoke test
-│   ├── test_phase6_calendar.py     # Google Calendar integration test
-│   └── test_booking_only.py        # Isolated booking step test
+│   ├── test_phase3_db.py
+│   ├── test_phase5_smoke.py
+│   ├── test_phase5_agent.py
+│   ├── test_phase6_calendar.py
+│   ├── test_booking_only.py
+│   ├── test_chat.py
+│   ├── evaluate_rag.py
+│   └── eval/
+│
 ├── requirements.txt
-├── railway.json                    # Railway deployment config
-├── .env.example                    # Environment variable template
-├── .gitignore
+├── railway.json
+├── seed_demo.py
 └── README.md
-
 ```
+
+Additional development, backup, and patch scripts are also present in the repository.
 
 ---
 
@@ -281,202 +368,335 @@ tutoro-ai/
 
 ### Prerequisites
 
-* Python 3.11
-* PostgreSQL (local or hosted)
-* Redis (local or Upstash)
-* Twilio account (WhatsApp Sandbox for development)
-* Google Cloud project with Calendar API enabled + service account
-* Groq API key
+- Python 3.11
+- PostgreSQL
+- Redis
+- Groq API key
+- Twilio account with WhatsApp configuration
+- Google Cloud project with Calendar API enabled
+- Google service-account credentials
 
-Verify Python:
-
-```bash
-python --version
-
-```
-
----
-
-### Clone the Repository
+### Step 1 — Clone the Repository
 
 ```bash
-git clone https://github.com/Shaarwesh/tutoro-ai.git
-cd tutoro-ai
-
+git clone https://github.com/Shaarwesh/TutoroAI.git
+cd TutoroAI
 ```
 
-### Install Dependencies
+### Step 2 — Create a Virtual Environment
+
+```bash
+python -m venv .venv
+```
+
+On Windows PowerShell:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
+
+On macOS or Linux:
+
+```bash
+source .venv/bin/activate
+```
+
+### Step 3 — Install Dependencies
 
 ```bash
 pip install -r requirements.txt
-
 ```
 
-### Configure Environment Variables
+### Step 4 — Configure Environment Variables
 
-```bash
-cp .env.example .env
-# Fill in your actual values in .env
+Create a `.env` file in the project root.
 
-```
+```dotenv
+# Database
+DATABASE_URL=postgresql+asyncpg://USER:PASSWORD@HOST:5432/DATABASE
+REDIS_URL=redis://localhost:6379
 
-Required variables:
+# AI
+GROQ_API_KEY=your_groq_api_key
 
-```
-TWILIO_ACCOUNT_SID=
-TWILIO_AUTH_TOKEN=
-TWILIO_WHATSAPP_NUMBER=
-GROQ_API_KEY=
-DATABASE_URL=
-REDIS_URL=rediss://...
-GOOGLE_CALENDAR_ID=
+# Twilio
+TWILIO_ACCOUNT_SID=your_twilio_sid
+TWILIO_AUTH_TOKEN=your_twilio_auth_token
+TWILIO_WHATSAPP_NUMBER=whatsapp:+YOUR_TWILIO_NUMBER
+
+# Google Calendar
+GOOGLE_CALENDAR_ID=your_calendar_id
 GOOGLE_SERVICE_ACCOUNT_FILE=app/credentials/google_service_account.json
-ADMIN_WHATSAPP_NUMBER=whatsapp:+60xxxxxxxxx
-APP_ENV=development
-SECRET_KEY=your_random_secret
 
+# Admin
+ADMIN_INITIAL_PASSWORD=replace_with_a_strong_password_at_least_12_chars
+ADMIN_WHATSAPP_NUMBER=whatsapp:+60XXXXXXXXX
+ADMIN_RECOVERY_EMAIL=
+
+# Application
+APP_ENV=development
+SECRET_KEY=replace_with_a_long_random_secret
+DEMO_MODE=0
+PORT=8000
+
+# Optional
+SENTRY_DSN=
 ```
 
-### Build the Knowledge Base Index
+Important:
+
+- `DATABASE_URL` is required.
+- The first admin account requires an initial password of at least 12 characters.
+- Google Calendar integration requires access to the configured calendar.
+- The application also supports `GOOGLE_CREDENTIALS_JSON` for service-account credentials supplied through an environment variable.
+- Never commit actual credentials, private keys, or customer information.
+
+### Step 5 — Build the Knowledge Base
 
 ```bash
 python -m app.tools.knowledge_base
-
 ```
 
-### Start the Server
+This processes the FAQ documents and creates the FAISS vector index.
+
+### Step 6 — Run the Application
 
 ```bash
 uvicorn app.main:app --reload --port 8000
-
 ```
 
-### Expose via ngrok (for Twilio webhook testing)
+Access the application locally:
+
+| Page | URL |
+|---|---|
+| API Documentation | `http://localhost:8000/docs` |
+| Admin Login | `http://localhost:8000/login` |
+| Dashboard | `http://localhost:8000/dashboard` |
+| Student Directory | `http://localhost:8000/students` |
+| Timetable | `http://localhost:8000/timetable` |
+| Analytics | `http://localhost:8000/analytics` |
+
+The initial administrator username is `admin`, with the password configured during first-time setup.
+
+### Step 7 — Connect WhatsApp
+
+For local Twilio webhook testing, expose the FastAPI server using a tool such as ngrok:
 
 ```bash
 ngrok http 8000
-# Set webhook URL in Twilio console:
-# https://<your-ngrok>.ngrok.io/webhook/whatsapp
-
 ```
+
+Set the Twilio inbound webhook to:
+
+```text
+POST https://YOUR-PUBLIC-URL/webhook/whatsapp
+```
+
+For non-development environments, the webhook validates Twilio request signatures.
+
+### Optional — Browser Chat Demo
+
+TUTORO AI also contains a browser-based demonstration page.
+
+Enable it in `.env`:
+
+```dotenv
+DEMO_MODE=1
+```
+
+Restart the application, then visit:
+
+```text
+http://localhost:8000/demo
+```
+
+This demo uses the same AI agent execution pipeline without requiring a Twilio inbound message.
+
+It can still access configured databases and calendar services, so use test data and a test calendar when demonstrating bookings.
 
 ---
 
-## 🧪 Testing
+## 🧪 Testing and Evaluation
 
-TUTORO AI was tested across all major functional modules:
+The repository contains development tests and evaluation scripts for key components.
 
-| Test | File | What it validates |
-| --- | --- | --- |
-| Database CRUD | `test_phase3_db.py` | Lead + booking creation, updates, queries |
-| Calendar integration | `test_phase6_calendar.py` | Real slot fetching, event creation, cancellation |
-| Agent smoke test | `test_phase5_smoke.py` | Tool-calling with 4 messages, token-efficient |
-| Full flow test | `test_phase5_agent.py` | Complete registration → booking in one conversation |
-| Booking step | `test_booking_only.py` | Isolated Calendar booking confirmation |
+| File | Test Area |
+|---|---|
+| `tests/test_phase3_db.py` | Database operations |
+| `tests/test_phase5_smoke.py` | Agent smoke testing |
+| `tests/test_phase5_agent.py` | Agent conversational flow |
+| `tests/test_phase6_calendar.py` | Google Calendar integration |
+| `tests/test_booking_only.py` | Trial booking workflow |
+| `tests/test_chat.py` | Chat functionality |
+| `tests/evaluate_rag.py` | RAG retrieval evaluation |
+| `tests/eval/run_eval.py` | Evaluation workflow |
 
-Run any test:
+Example:
 
 ```bash
-python tests/test_phase5_agent.py
-
+python tests/test_phase5_smoke.py
 ```
 
-Testing confirmed end-to-end reliability including:
+The repository also contains stored evaluation reports and result files.
 
-* Correct data extraction from packed natural-language messages
-* Accurate fee calculation from the knowledge base
-* Real Google Calendar events with correct parent/student/subject data
-* Returning customer recognition across sessions
-* Error recovery when Groq temporarily fails (self-correction behavior)
+These scripts support development and evaluation; successful execution may depend on environment configuration, external credentials, and test data. Live integration tests were not independently executed as part of this documentation review.
 
 ---
 
-## 📊 Admin Dashboard
+## 🚧 Development Status
 
-Access the visual analytics dashboard in any browser:
+The main focus of TUTORO AI is its autonomous conversational agent, supported by a developing administrative management system.
 
-```
-https://your-deployment-url.up.railway.app/admin/dashboard?key=YOUR_SECRET_KEY
+### Implemented
 
-```
+- [x] Twilio WhatsApp webhook integration
+- [x] LangChain AI tool-calling agent
+- [x] English and Bahasa Malaysia conversational support
+- [x] FAISS-based knowledge retrieval
+- [x] Parent and student registration
+- [x] Existing-customer lookup
+- [x] PostgreSQL class availability checking
+- [x] Google Calendar trial-class booking
+- [x] Booking lookup and cancellation
+- [x] Sibling registration
+- [x] Waitlist registration
+- [x] Basic human-handoff support
+- [x] Admin authentication
+- [x] Class schedule creation, editing, and deletion
+- [x] Basic student directory
+- [x] Basic analytics reporting
+- [x] Browser-based chat demo
 
-Shows:
+### Under Development
 
-* Total leads, trial bookings, conversion rate, pipeline count
-* Most requested subjects (ranked bar chart)
-* Recent enquiries with stage badges (new / qualified / confirmed / booked)
+- [ ] Detailed clickable student profiles
+- [ ] Full weekly timetable interface
+- [ ] Accurate capacity updates following booking cancellation
+- [ ] Fully automated booking rescheduling
+- [ ] WhatsApp delivery of scheduled reminders
+- [ ] Improved administrative workflows
+- [ ] Reliable synchronization between bookings, calendars, and schedules
+- [ ] Additional automated integration and regression tests
 
 ---
 
-## ⚠️ Current Limitations
+## ⚠️ Known Limitations
 
-### Groq Free Tier Rate Limits
+**1. Admin dashboard maturity**
 
-The Groq free tier allows 100,000 tokens/day on the Llama 3.3 70B model. Each agent turn consumes approximately 2,000-4,000 tokens (system prompt + tool schemas + conversation history + RAG context). For production use, a paid Groq plan or alternative provider is recommended.
+The current dashboard offers basic administrative functionality, but it is not yet a complete tuition-centre CRM.
 
-### In-Memory Slot Cache
+**2. Class capacity reconciliation**
 
-The `_slot_cache` that maps shown calendar slot numbers to actual datetime objects is stored in-process memory. A server restart between showing slots and a customer picking one would invalidate the cache. Moving this to Redis (already used for conversation state) is the recommended fix before full production deployment.
+Confirmed bookings increment the stored class occupancy. The existing cancellation workflow does not yet decrement that count.
 
-### FAISS Index Rebuild on Cold Start
+**3. Rescheduling workflow**
 
-On deployments without a pre-built FAISS index (e.g. fresh Railway deployments), the embedding model must download and build the index from scratch on startup, which requires ~1GB RAM and ~30 seconds. The pre-built index files should be committed or cached to avoid this on every deploy.
+The rescheduling tool currently directs customers to an administrator rather than automatically moving calendar events and booking records.
+
+**4. Reminder delivery**
+
+The reminder module generates local JSON records; outbound WhatsApp reminder delivery remains unimplemented.
+
+**5. Single-centre configuration**
+
+The application is currently structured around a single tuition-centre deployment rather than supporting isolated accounts for multiple businesses.
+
+**6. External service dependencies**
+
+Real bookings and WhatsApp interactions require correctly configured Groq, Twilio, Google Calendar, PostgreSQL, and Redis services.
+
+**7. AI response reliability**
+
+LLM tool selection, multilingual output, and RAG answer accuracy require continued testing across realistic customer conversations.
 
 ---
 
 ## 🔮 Future Improvements
 
-Potential extensions include:
+Planned improvements include:
 
-* **Multi-tenant architecture** — one deployment serving multiple tuition centres / salons / businesses with isolated knowledge bases and configurations
-* **Payment integration** — DuitNow/ToyyibPay/Billplz link sent post-booking for the registration fee
-* **Voice note transcription** — Whisper API transcription of customer voice notes (Twilio supports media URLs)
-* **Sentiment-aware escalation** — automatic handoff to human staff if the agent detects customer frustration
-* **Regular class booking** — beyond trial sessions, full recurring weekly class scheduling
-* **Parent portal** — a shareable link showing booking status, upcoming classes, and payment history
-* **Weekly broadcast messages** — business owner sends promotional WhatsApp blasts to all leads
-* **Google Sheets sync** — automatic lead export for businesses using existing spreadsheet workflows
-
----
-
-## 🎓 Project Context
-
-**Project Name:** TUTORO AI — WhatsApp Sales & Booking Agent
-
-**Project Type:** Personal Project (AI Software Development)
-
-**Application Type:** Agentic AI System — WhatsApp Automation
-
-**Deployment Platform:** Railway
-
-**Primary Language:** Python 3.11
-
-This project demonstrates practical application of:
-
-* Agentic AI architecture (LangChain tool-calling agents)
-* Retrieval-Augmented Generation (RAG) with FAISS
-* Production API integrations (Twilio, Google Calendar, Groq)
-* Async Python web development (FastAPI + SQLAlchemy async)
-* Multi-database state management (PostgreSQL + Redis)
-* Bilingual NLP for English and Bahasa Malaysia
-* Cloud deployment and environment management
+- **Student Management:** Detailed student profiles, parent-student relationships, and registration histories.
+- **Capacity Management:** Reliable updates on confirmed bookings, cancellations, and class changes.
+- **Timetable Management:** Interactive weekly class schedules and clearer occupancy information.
+- **Booking Management:** Fully automated and safely synchronized rescheduling.
+- **WhatsApp Automation:** Scheduled reminder delivery and improved staff notifications.
+- **Human Handoff:** More complete customer-to-staff escalation.
+- **Multi-Tenancy:** Independent tuition-centre accounts and configurations.
+- **Payment Integration:** Online registration and tuition-fee collection.
+- **Parent Portal:** Self-service access to student and booking information.
+- **Analytics:** Improved enquiry tracking, booking conversion, and operational reporting.
 
 ---
 
-## 👩‍💻 Development
+## 💡 Technical Skills Demonstrated
 
-TUTORO AI was developed to explore the practical application of large language model agents in a real Malaysian SME business context — specifically the WhatsApp-first communication culture of small businesses in Malaysia, where most customer interaction happens via WhatsApp rather than web forms or phone calls.
+Developing TUTORO AI involved integrating multiple software-engineering concepts:
 
-The project bridges the gap between enterprise-grade AI agent tools (LangChain, Groq, FAISS) and accessible small-business automation — demonstrating that production-quality AI agents are buildable and deployable at minimal cost for real business use cases.
+**Artificial Intelligence**
+- Large Language Models
+- Agentic AI
+- Tool Calling
+- Retrieval-Augmented Generation
+- Semantic Search
+- Prompt Engineering
+
+**Backend Engineering**
+- Python
+- FastAPI
+- REST APIs
+- Webhooks
+- Asynchronous Programming
+- External API Integration
+
+**Data Engineering**
+- PostgreSQL
+- SQLAlchemy
+- Redis
+- FAISS
+- Database Relationships
+
+**Cloud and Integration**
+- Twilio WhatsApp API
+- Google Calendar API
+- Groq API
+- Railway Deployment
+- Environment Configuration
+
+**Application Development**
+- Business Workflow Automation
+- Error Handling
+- Authentication
+- Backend–Frontend Integration
+- Integration Testing
+- Iterative Product Development
+
+---
+
+## 👩‍💻 Developer
+
+### Shaarweshwary Saravanan
+
+**Bachelor of Computer Science (Software Development)**
+
+TUTORO AI is a personal project developed to explore the practical application of AI agents and software automation in small-business environments.
+
+My development work spans system architecture, AI agent integration, RAG implementation, backend development, database workflows, third-party API integrations, testing, deployment configuration, and administration-interface development.
+
+The project reflects my interest in building AI-enabled applications that connect conversational interfaces with practical business operations.
+
+**GitHub:** [github.com/Shaarwesh](https://github.com/Shaarwesh)
 
 ---
 
 ## 📄 License
 
-This project was developed for educational and portfolio purposes.
+This repository is shared for educational and portfolio demonstration purposes.
 
-Source code and project materials should not be redistributed, commercially used, or reproduced without permission.
+No separate open-source license is currently included. Reuse, modification, distribution, or commercial deployment should not be assumed to be permitted without the author's authorization.
 
 ---
 
-*Built by [Shaarweshwary Saravanan (Shaw)*](https://github.com/Shaarwesh)
+**Built by Shaarweshwary Saravanan**
+
+*Exploring the intersection of Agentic AI, RAG, backend engineering, and practical business automation.*
