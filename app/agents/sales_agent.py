@@ -16,6 +16,7 @@ from app.tools.schedule_tool import get_database_schedule
 from app.tools.booking_service import (
     create_trial_booking,
     cancel_trial_booking,
+    reschedule_trial_booking,
 )
 
 import logging
@@ -274,8 +275,8 @@ def book_trial(
             f"Date: {start.strftime('%d %B %Y')}\n"
             f"Time: {start.strftime('%I:%M %p')}\n"
             f"Class ID: {class_id}\n\n"
-            "Your booking has been saved and "
-            "added to Google Calendar."
+            "Your booking has been saved"
+            + (" and added to Google Calendar." if result.get("google_event_id") else ".")
         )
 
     except Exception as exc:
@@ -327,20 +328,36 @@ def reschedule_booking(
     student_name: str,
 ) -> str:
     """
-    Safely handle rescheduling requests.
-
-    This version avoids cancelling an
-    existing confirmed booking before
-    a replacement has been secured.
+    Move a confirmed booking to a different class. The new class is booked first;
+    the old seat is only released once the new booking is secured.
     """
-    return (
-        f"Rescheduling request received for "
-        f"booking #{booking_id}, requested "
-        f"class #{new_class_id}. "
-        "The existing booking remains confirmed. "
-        "Please contact the tuition centre "
-        "administrator to complete the change."
-    )
+    try:
+        result = _db_run(
+            reschedule_trial_booking(
+                phone=_real_phone(phone),
+                booking_id=booking_id,
+                new_class_id=new_class_id,
+                parent_name=parent_name,
+                student_name=student_name,
+            )
+        )
+        start = datetime.fromisoformat(result["start"])
+        note = "" if result.get("old_booking_cancelled") else (
+            f"\nNote: the old booking #{booking_id} could not be removed automatically; tell the customer staff will remove it."
+        )
+        return (
+            "✅ *BOOKING RESCHEDULED!*\n\n"
+            f"New Booking ID: {result['booking_id']}\n"
+            f"Date: {start.strftime('%d %B %Y')}\n"
+            f"Time: {start.strftime('%I:%M %p')}\n"
+            f"Class ID: {new_class_id}" + note
+        )
+    except Exception as exc:
+        logger.exception("Reschedule failed")
+        return (
+            "Rescheduling was not completed: "
+            f"{exc} The original booking is unchanged. Offer another class or staff help."
+        )
 
 
 

@@ -20,19 +20,34 @@
     <main class="flex-1 p-8 overflow-y-auto">
         <h1 class="text-3xl font-bold mb-6">Weekly Report Card</h1>
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-            <div class="bg-white rounded-xl shadow p-5">
-                <div class="text-sm text-gray-500">Leads captured</div>
+        <div class="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+            <a href="/students" class="bg-white rounded-xl shadow p-5 hover:shadow-md transition">
+                <div class="text-sm text-gray-500">Unique leads</div>
                 <div class="text-4xl font-bold">{{ d.total_leads }}</div>
-            </div>
+            </a>
+            <a href="/students" class="bg-white rounded-xl shadow p-5 hover:shadow-md transition">
+                <div class="text-sm text-gray-500">Converted leads</div>
+                <div class="text-4xl font-bold">{{ d.converted_leads }}</div>
+                <div class="text-xs text-gray-400">at least one confirmed booking</div>
+            </a>
             <div class="bg-white rounded-xl shadow p-5">
-                <div class="text-sm text-gray-500">Trial bookings</div>
-                <div class="text-4xl font-bold">{{ d.total_bookings }}</div>
-            </div>
-            <div class="bg-white rounded-xl shadow p-5">
-                <div class="text-sm text-gray-500">Lead → booking conversion</div>
+                <div class="text-sm text-gray-500">Conversion rate</div>
                 <div class="text-4xl font-bold">{{ d.conversion_rate_percent }}%</div>
+                <div class="text-xs text-gray-400">converted leads ÷ unique leads</div>
             </div>
+            <div class="bg-white rounded-xl shadow p-5">
+                <div class="text-sm text-gray-500">Confirmed bookings</div>
+                <div class="text-4xl font-bold text-green-600">{{ d.total_bookings }}</div>
+            </div>
+            <div class="bg-white rounded-xl shadow p-5">
+                <div class="text-sm text-gray-500">Cancelled bookings</div>
+                <div class="text-4xl font-bold text-red-500">{{ d.cancelled_bookings }}</div>
+            </div>
+            <a href="/timetable" class="bg-white rounded-xl shadow p-5 hover:shadow-md transition">
+                <div class="text-sm text-gray-500">Seat occupancy</div>
+                <div class="text-4xl font-bold">{{ d.occupancy_percent }}%</div>
+                <div class="text-xs text-gray-400">{{ d.seats_filled }} of {{ d.seats_total }} seats filled</div>
+            </a>
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">

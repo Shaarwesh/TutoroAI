@@ -3,6 +3,7 @@
 
 import asyncio
 import logging
+import re
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
@@ -194,27 +195,28 @@ async def create_trial_booking(
                         "a booking for this class time."
                     )
 
-                available = await asyncio.to_thread(
-                    is_calendar_slot_available,
-                    start,
-                    end,
-                )
-
-                if not available:
-                    raise ValueError(
-                        "The selected time is occupied "
-                        "in Google Calendar."
+                if settings.google_calendar_id:  # calendar is optional (e.g. local demo)
+                    available = await asyncio.to_thread(
+                        is_calendar_slot_available,
+                        start,
+                        end,
                     )
 
-                event_id = await asyncio.to_thread(
-                    create_calendar_event,
-                    student_name,
-                    parent_name,
-                    phone,
-                    subjects,
-                    start,
-                    end,
-                )
+                    if not available:
+                        raise ValueError(
+                            "The selected time is occupied "
+                            "in Google Calendar."
+                        )
+
+                    event_id = await asyncio.to_thread(
+                        create_calendar_event,
+                        student_name,
+                        parent_name,
+                        phone,
+                        subjects,
+                        start,
+                        end,
+                    )
 
                 booking = Booking(
                     lead_id=lead.id,
@@ -317,6 +319,19 @@ async def cancel_trial_booking(
                             "was not cancelled."
                         )
 
+                # Release the seat (once): the class id is stored in the booking notes.
+                match = re.search(r"Class ID:\s*(\d+)", booking.notes or "")
+                if match:
+                    schedule = (
+                        await db.execute(
+                            select(ClassSchedule)
+                            .where(ClassSchedule.id == int(match.group(1)))
+                            .with_for_update()
+                        )
+                    ).scalar_one_or_none()
+                    if schedule and (schedule.current_enrolled or 0) > 0:
+                        schedule.current_enrolled -= 1
+
                 booking.status = "cancelled"
 
         return {
@@ -326,3 +341,42 @@ async def cancel_trial_booking(
 
     finally:
         await engine.dispose()
+
+
+async def reschedule_trial_booking(
+    phone: str,
+    booking_id: int,
+    new_class_id: int,
+    parent_name: str,
+    student_name: str,
+):
+    """Book the NEW class first; only then release the old seat."""
+    engine = create_async_engine(settings.database_url, echo=False)
+    Session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    try:
+        async with Session() as db:
+            old = (
+                await db.execute(
+                    select(Booking).where(Booking.id == booking_id, Booking.phone == phone)
+                )
+            ).scalar_one_or_none()
+        if not old or old.status != "confirmed":
+            raise ValueError("No active booking with that ID was found for this customer.")
+        subjects = old.subjects or "Not specified"
+    finally:
+        await engine.dispose()
+
+    new = await create_trial_booking(
+        phone=phone,
+        parent_name=parent_name,
+        student_name=student_name,
+        class_id=new_class_id,
+        subjects=subjects,
+    )
+    try:
+        await cancel_trial_booking(phone=phone, booking_id=booking_id)
+        new["old_booking_cancelled"] = True
+    except Exception:
+        logger.exception("Old booking %s could not be released after reschedule", booking_id)
+        new["old_booking_cancelled"] = False
+    return new
