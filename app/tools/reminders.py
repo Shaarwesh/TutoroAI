@@ -1,89 +1,157 @@
-"""
-Reminder system — Phase 9 (Quick Win)
-Checks for trial classes happening in ~24 hours and sends WhatsApp reminders.
-Designed to be triggered by a scheduled job (e.g. Railway Cron, or called
-periodically). Not triggered by the conversational agent directly.
-"""
+
+"""Free local booking reminder system."""
+
+import asyncio
+import json
 import logging
 from datetime import datetime, timedelta, timezone
-from twilio.rest import Client
+from pathlib import Path
+from zoneinfo import ZoneInfo
 
-from app.config import settings
+from sqlalchemy import select
+
 from app.db.postgres import AsyncSessionLocal
 from app.models.booking import Booking
-from sqlalchemy import select
+
 
 logger = logging.getLogger(__name__)
 
-_client: Client | None = None
+MYT = ZoneInfo("Asia/Kuala_Lumpur")
+
+DATA_DIR = Path("data")
+REMINDER_FILE = DATA_DIR / "local_reminders.json"
+STATE_FILE = DATA_DIR / "reminder_state.json"
 
 
-def _get_client() -> Client:
-    global _client
-    if _client is None:
-        _client = Client(settings.twilio_account_sid, settings.twilio_auth_token)
-    return _client
+def load_json(path, default):
+    if not path.exists():
+        return default
 
-
-def _send_whatsapp(to_number: str, message: str) -> bool:
     try:
-        client = _get_client()
-        client.messages.create(
-            from_=settings.twilio_whatsapp_number,
-            to=to_number,
-            body=message,
+        return json.loads(
+            path.read_text(encoding="utf-8")
         )
-        return True
-    except Exception as e:
-        logger.error(f"Failed to send reminder to {to_number}: {e}")
-        return False
+    except (OSError, json.JSONDecodeError):
+        logger.exception(
+            "Could not read %s", path
+        )
+        raise
 
 
-async def send_upcoming_reminders(hours_ahead: int = 24) -> dict:
+def save_json(path, data):
+    DATA_DIR.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    temporary = path.with_suffix(
+        path.suffix + ".tmp"
+    )
+
+    temporary.write_text(
+        json.dumps(
+            data,
+            indent=2,
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
+    temporary.replace(path)
+
+
+async def send_upcoming_reminders(
+    hours_ahead: int = 24,
+):
     """
-    Find all confirmed bookings happening within the next `hours_ahead` hours
-    that haven't been reminded yet, and send a WhatsApp reminder for each.
-
-    Returns a summary dict: {"checked": N, "sent": N, "failed": N}
+    Create local reminders for confirmed
+    bookings happening within the next
+    specified number of hours.
     """
     now = datetime.now(timezone.utc)
-    window_end = now + timedelta(hours=hours_ahead)
-    window_start = now + timedelta(hours=hours_ahead - 2)  # ~2hr window to avoid double-sends if run hourly
+    end = now + timedelta(
+        hours=hours_ahead
+    )
 
-    summary = {"checked": 0, "sent": 0, "failed": 0}
+    summary = {
+        "checked": 0,
+        "created": 0,
+        "skipped": 0,
+    }
+
+    state = load_json(
+        STATE_FILE, {}
+    )
+    reminders = load_json(
+        REMINDER_FILE, []
+    )
 
     async with AsyncSessionLocal() as db:
         result = await db.execute(
             select(Booking).where(
                 Booking.status == "confirmed",
-                Booking.appointment_start >= window_start,
-                Booking.appointment_start <= window_end,
+                Booking.appointment_start > now,
+                Booking.appointment_start <= end,
             )
         )
+
         bookings = result.scalars().all()
         summary["checked"] = len(bookings)
 
         for booking in bookings:
-            slot_text = booking.notes or "your scheduled time"
-            message = (
-                f"📅 *Reminder: Trial Class Tomorrow!*\n\n"
-                f"This is a friendly reminder about your trial class:\n"
-                f"{slot_text}\n"
-                f"Subjects: {booking.subjects}\n\n"
-                f"See you soon! Reply if you need to reschedule. 😊"
+            key = (
+                f"{booking.id}:"
+                f"{booking.appointment_start.isoformat()}"
             )
-            success = _send_whatsapp(booking.phone, message)
-            if success:
-                summary["sent"] += 1
-            else:
-                summary["failed"] += 1
 
-    logger.info(f"Reminder check complete: {summary}")
+            if key in state:
+                summary["skipped"] += 1
+                continue
+
+            local_start = (
+                booking.appointment_start
+                .replace(tzinfo=timezone.utc)
+                if booking.appointment_start.tzinfo is None
+                else booking.appointment_start
+            ).astimezone(MYT)
+
+            message = (
+                "Trial Class Reminder\n"
+                f"Booking ID: {booking.id}\n"
+                f"Date: {local_start:%d %B %Y}\n"
+                f"Time: {local_start:%I:%M %p}\n"
+                f"Subjects: {booking.subjects}\n"
+                f"Phone: {booking.phone}"
+            )
+
+            reminders.append({
+                "booking_id": booking.id,
+                "phone": booking.phone,
+                "appointment": (
+                    booking.appointment_start
+                    .isoformat()
+                ),
+                "message": message,
+                "created_at": now.isoformat(),
+                "delivery": "local_only",
+            })
+
+            state[key] = now.isoformat()
+            summary["created"] += 1
+
+    # Write reminder output before recording
+    # completion, so failures can be retried.
+    save_json(REMINDER_FILE, reminders)
+    save_json(STATE_FILE, state)
+
+    logger.info(
+        "Reminder summary: %s", summary
+    )
     return summary
 
 
 if __name__ == "__main__":
-    """Run manually: python -m app.tools.reminders"""
-    import asyncio
-    result = asyncio.run(send_upcoming_reminders())
-    print(f"Reminder run complete: {result}")
+    result = asyncio.run(
+        send_upcoming_reminders()
+    )
+    print(result)

@@ -12,6 +12,12 @@ from app.config import settings
 from app.tools.knowledge_base import query_knowledge_base as _query_kb
 from app.tools.schedule_tool import get_database_schedule
 
+
+from app.tools.booking_service import (
+    create_trial_booking,
+    cancel_trial_booking,
+)
+
 import logging
 import asyncio
 from typing import Optional
@@ -231,49 +237,57 @@ def check_available_classes(subject_requested: Optional[str] = None) -> str:
         logger.error(f"check_available_classes error: {e}")
         return "Sorry, I couldn't check the schedule right now."
 
+
 @tool
-def book_trial(phone: str, parent_name: str, student_name: str, class_id: int, subjects: Optional[str] = "Not specified") -> str:
-    """Book a trial class using the Class ID from the check_available_classes list."""
+def book_trial(
+    phone: str,
+    parent_name: str,
+    student_name: str,
+    class_id: int,
+    subjects: Optional[str] = "Not specified",
+) -> str:
+    """
+    Book a real trial class using the database
+    timetable and Google Calendar.
+    """
     try:
-        _db_run(_save_booking_async(phone, subjects or "Not specified", f"Trial Class ID: {class_id}"))
+        result = _db_run(
+            create_trial_booking(
+                phone=_real_phone(phone),
+                parent_name=parent_name,
+                student_name=student_name,
+                class_id=class_id,
+                subjects=subjects or "Not specified",
+            )
+        )
+
+        start = datetime.fromisoformat(
+            result["start"]
+        )
 
         return (
-            f"🎉 *TRIAL CLASS CONFIRMED!*\n\n"
-            f"Thank you, {parent_name}! Here are your booking details:\n\n"
-            f"👤 *Student:* {student_name}\n"
-            f"📚 *Subject(s):* {subjects or 'Not specified'}\n"
-            f"📅 *Class ID:* {class_id}\n\n"
-            f"📍 *Location:* Wesh Tuition Centre, Melaka\n"
-            f"📌 *Reminder:* Please arrive 10 minutes early. Don't forget to bring a notebook and stationery!\n\n"
-            f"We will send you a reminder closer to the date. Let us know if you have any questions. See you soon! 😊"
+            "🎉 *TRIAL CLASS CONFIRMED!*\n\n"
+            f"Booking ID: {result['booking_id']}\n"
+            f"Student: {student_name}\n"
+            f"Parent: {parent_name}\n"
+            f"Subjects: {result['subjects']}\n"
+            f"Date: {start.strftime('%d %B %Y')}\n"
+            f"Time: {start.strftime('%I:%M %p')}\n"
+            f"Class ID: {class_id}\n\n"
+            "Your booking has been saved and "
+            "added to Google Calendar."
         )
-    except Exception as e:
-        logger.error(f"book_trial error: {e}")
-        return f"Booking failed: {e}"
 
-async def _get_bookings_async(phone: str):
-    from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-    from app.db.crud_booking import get_bookings_by_phone
+    except Exception as exc:
+        logger.exception(
+            "Trial booking failed"
+        )
+        return (
+            "Booking could not be confirmed: "
+            f"{exc}. Please choose another "
+            "available class or contact staff."
+        )
 
-    engine = create_async_engine(settings.database_url, echo=False)
-    Session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-    try:
-        async with Session() as db:
-            return await get_bookings_by_phone(db, phone)
-    finally:
-        await engine.dispose()
-
-async def _cancel_booking_async(booking_id: int):
-    from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-    from app.db.crud_booking import cancel_booking
-
-    engine = create_async_engine(settings.database_url, echo=False)
-    Session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-    try:
-        async with Session() as db:
-            return await cancel_booking(db, booking_id)
-    finally:
-        await engine.dispose()
 
 @tool
 def check_my_booking(phone: str) -> str:
@@ -303,75 +317,65 @@ def request_human_handoff(phone: str, reason: str) -> str:
         logger.error(f"Handoff error: {e}")
         return "Handoff failed, but tell the user someone will contact them."
 
-@tool
-def reschedule_booking(phone: str, booking_id: int, new_class_id: int, parent_name: str, student_name: str) -> str:
-    """Reschedules an existing booking to a new class ID in one step."""
-    try:
-        bookings = _db_run(_get_bookings_async(phone))
-        target_booking = next((b for b in bookings if b.id == booking_id), None)
-        if not target_booking:
-            return "Could not find the original booking to reschedule."
-
-        _db_run(_cancel_booking_async(booking_id))
-
-        return book_trial.invoke({
-            "phone": phone, 
-            "parent_name": parent_name, 
-            "student_name": student_name, 
-            "class_id": new_class_id, 
-            "subjects": target_booking.subjects
-        })
-    except Exception as e:
-        logger.error(f"reschedule_booking error: {e}")
-        return f"Rescheduling failed: {e}"
-
-
-# ── Extra tools: cancel, siblings, waitlist ───────────────────────────────────
-
-async def _add_sibling_async(phone, student_name, form_year, subjects):
-    from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-    from sqlalchemy import select
-    from app.models.lead import Lead
-    from app.db.crud_student import add_student
-
-    engine = create_async_engine(settings.database_url, echo=False)
-    Session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-    try:
-        async with Session() as db:
-            lead = (await db.execute(select(Lead).where(Lead.phone == phone))).scalar_one_or_none()
-            if not lead:
-                return None
-            return await add_student(db, lead.id, student_name, form_year, subjects)
-    finally:
-        await engine.dispose()
-
-async def _join_waitlist_async(phone, parent_name, student_name, subjects, preferred_day):
-    from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-    from app.models.waitlist import Waitlist
-
-    engine = create_async_engine(settings.database_url, echo=False)
-    Session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-    try:
-        async with Session() as db:
-            db.add(Waitlist(phone=phone, parent_name=parent_name, student_name=student_name,
-                            subjects=subjects, preferred_day=preferred_day))
-            await db.commit()
-    finally:
-        await engine.dispose()
 
 @tool
-def cancel_my_booking(phone: str, booking_id: int) -> str:
-    """Cancel one of the customer's confirmed bookings. Use check_my_booking first to get the booking ID, and confirm with the customer before calling this."""
+def reschedule_booking(
+    phone: str,
+    booking_id: int,
+    new_class_id: int,
+    parent_name: str,
+    student_name: str,
+) -> str:
+    """
+    Safely handle rescheduling requests.
+
+    This version avoids cancelling an
+    existing confirmed booking before
+    a replacement has been secured.
+    """
+    return (
+        f"Rescheduling request received for "
+        f"booking #{booking_id}, requested "
+        f"class #{new_class_id}. "
+        "The existing booking remains confirmed. "
+        "Please contact the tuition centre "
+        "administrator to complete the change."
+    )
+
+
+
+@tool
+def cancel_my_booking(
+    phone: str,
+    booking_id: int,
+) -> str:
+    """
+    Cancel the customer's confirmed booking
+    in PostgreSQL and Google Calendar.
+    """
     try:
-        bookings = _db_run(_get_bookings_async(phone))
-        target = next((b for b in bookings if b.id == booking_id and b.status == "confirmed"), None)
-        if not target:
-            return "No active booking with that ID was found for this number."
-        _db_run(_cancel_booking_async(booking_id))
-        return f"Booking {booking_id} has been cancelled. Tell the customer it is cancelled and offer to book another time."
-    except Exception as e:
-        logger.error(f"cancel_my_booking error: {e}")
-        return f"Cancellation failed: {e}"
+        result = _db_run(
+            cancel_trial_booking(
+                phone=_real_phone(phone),
+                booking_id=booking_id,
+            )
+        )
+
+        return (
+            f"Booking #{result['booking_id']} "
+            "has been cancelled successfully."
+        )
+
+    except Exception as exc:
+        logger.exception(
+            "Booking cancellation failed"
+        )
+        return (
+            "Cancellation was not completed: "
+            f"{exc}. The customer should "
+            "contact staff for assistance."
+        )
+
 
 @tool
 def add_sibling(phone: str, student_name: str, form_year: Optional[str] = None, subjects: Optional[str] = None) -> str:
